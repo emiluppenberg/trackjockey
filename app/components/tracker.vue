@@ -4,6 +4,7 @@ import {
   isSample,
   sleep,
   type Figure,
+  type Measure,
   type Sample,
   type Track,
   type Tracker,
@@ -13,10 +14,11 @@ const props = defineProps<{
   samples: Sample[];
 }>();
 const emit = defineEmits(["playSample", "stopSample"]);
-const tracker = ref<Tracker>();
-const activeTrack = ref<Track>();
+const tracker = ref<Tracker>({ bpm: 120, tracks: [{ figure: undefined }] });
+const activeTrack = ref<Track>({ figure: undefined });
 const isPlaying = ref<boolean>(false);
 const isChangingActiveTrack = ref<boolean>(false);
+const cursor = ref<number>(0);
 
 async function playTracker() {
   if (tracker.value) {
@@ -36,6 +38,7 @@ async function playTracker() {
       if (j === 64) {
         j = 0;
       }
+      cursor.value = j;
       if (j === 0) {
         i++;
       }
@@ -46,7 +49,7 @@ async function playTracker() {
         if (tracker.value.tracks[k]) {
           if (tracker.value.tracks[k]!.figure) {
             const f = tracker.value.tracks[k]!.figure!;
-            noteLength = (1 / (64 / 4)) * (60 / f.tempo) * 1000; // milliseconds
+            noteLength = (1 / (64 / 4)) * (60 / tracker.value.bpm) * 1000; // milliseconds
             for (const p of f!.patterns) {
               const m = p.measures.find((_m) => _m.index === i);
               if (m && m.fNotes[j] !== "-") {
@@ -82,23 +85,12 @@ async function playTracker() {
   }
 }
 
-function changeActiveTrack(e: Event) {
-  const value = (e.target as HTMLInputElement).value;
+function changeTrackerBpm(e: Event) {
+  const element = e.target as HTMLInputElement;
+  const value = element.value;
   if (Number(value)) {
-    const idxT = Number(value) - 1;
     if (tracker.value) {
-      const t = tracker.value.tracks[idxT];
-      if (t) {
-        activeTrack.value = t;
-        return;
-      }
-    }
-  }
-  if (activeTrack.value) {
-    if (tracker.value) {
-      (e.target as HTMLInputElement).value = (
-        tracker.value.tracks.indexOf(activeTrack.value) + 1
-      ).toString();
+      tracker.value.bpm = Number(value);
     }
   }
 }
@@ -121,13 +113,17 @@ function changeTracksLength(e: Event) {
     }
   }
 }
-function changeTrackFigureWithKeyBind(e: KeyboardEvent) {
+function handleChangeActiveTrackFigure(e: KeyboardEvent) {
   if (e.code === "Tab") {
     return;
   }
   e.preventDefault();
   if (tracker.value) {
     if (activeTrack.value) {
+      if (e.code === "KeyQ") {
+        activeTrack.value.figure = undefined;
+        return;
+      }
       const f = props.figures.find((_f) => _f.keyBind === e.code);
       if (f) {
         activeTrack.value.figure = f;
@@ -148,57 +144,23 @@ function changeSoundKeyBind(e: KeyboardEvent, sound: Figure | Sample) {
     sound.keyBind = e.code;
   }
 }
-function handleActiveTrackFocus(e: KeyboardEvent) {
-  e.preventDefault();
-  isChangingActiveTrack.value = !isChangingActiveTrack.value;
-  switch (isChangingActiveTrack.value) {
-    case true:
-      const activeTrackElement = document.getElementById("active-track-input");
-      if (activeTrackElement) {
-        activeTrackElement.focus();
-      }
-      break;
-    case false:
-      const enableKeysElement = document.getElementById("tracker-enable-keys");
-      if (enableKeysElement) {
-        enableKeysElement.focus();
-      }
-  }
-}
-function handleEnableKeysFocus(e: KeyboardEvent) {
-  if (!isChangingActiveTrack.value) {
-    e.preventDefault();
-    const enableKeysElement = document.getElementById("tracker-enable-keys");
-    if (enableKeysElement) {
-      enableKeysElement.focus();
-    }
-  }
-}
+
 function handlePlayOrStop(e: KeyboardEvent) {
   e.preventDefault();
   switch (isPlaying.value) {
     case true:
       isPlaying.value = false;
+      cursor.value = 0;
       break;
     case false:
       playTracker();
       break;
   }
 }
-function selectAllText(e: Event) {
-  const target = e.target as HTMLInputElement;
-  target.select();
-}
+
 onMounted(() => {
-  tracker.value = { tracks: [{}, {}, {}] };
-  activeTrack.value = tracker.value.tracks[0];
+  activeTrack.value = tracker.value.tracks[0]!;
   window.addEventListener("keydown", (e) => {
-    if (e.code === "Period") {
-      handleActiveTrackFocus(e);
-    }
-    if (e.code === "Slash") {
-      handleEnableKeysFocus(e);
-    }
     if (e.code === "Space") {
       handlePlayOrStop(e);
     }
@@ -207,77 +169,34 @@ onMounted(() => {
 </script>
 
 <template>
-  <!-- ActiveTrackInput -->
-  <div
-    id="active-track"
-    class="flex flex-col w-full items-center overflow-hidden"
-    :class="{ 'h-[50%]': isChangingActiveTrack, 'h-0': !isChangingActiveTrack }"
-  >
-    <label class="text-center">Active track</label>
-    <input
-      id="active-track-input"
-      type="text"
-      class="border-t text-center"
-      @change="(e) => changeActiveTrack(e)"
-      @focus="(e) => selectAllText(e)"
-      @keydown.enter="(e) => handleActiveTrackFocus(e)"
-    />
-    <button
-      id="active-track-figure"
-      v-if="activeTrack?.figure"
-      class="grow min-h-[25%] min-w-[20%] border border-black text-center select-none overflow-hidden grid place-items-center"
-      :style="{ 'background-color': activeTrack.figure.color }"
-    >
-      <span class="text-center">
-        {{ activeTrack.figure.name }}
-      </span>
-    </button>
-  </div>
   <!-- Tracker -->
   <div
     id="tracker-ui"
     v-if="tracker"
-    class="flex flex-col w-full overflow-hidden"
-    :class="{
-      'h-[50%]': !isChangingActiveTrack,
-      'h-[0%]': isChangingActiveTrack,
-    }"
+    class="flex flex-col w-full overflow-hidden h-[80%] border border-black"
   >
     <!-- Options -->
-    <div id="tracker-options" class="flex w-full h-[15%] border border-black">
-      <div
-        id="tracker-tracks"
-        class="w-[15%] flex flex-col border-r border-black"
-      >
-        <label class="text-center">Tracks</label>
-        <input
-          type="text"
-          :value="tracker.tracks.length.toString()"
-          class="border-t text-center"
-          @change="(e) => changeTracksLength(e)"
-        />
-      </div>
-      <div id="tracker-active" class="grow flex flex-col border-r">
-        <label id="tracker-active-index" class="text-center">
-          Activetrack:
-          {{ (tracker.tracks.indexOf(activeTrack!) + 1).toString() }}
-        </label>
-        <label id="tracker-active-name" class="border-t text-center">
-          {{ activeTrack?.figure?.name }}
-        </label>
-      </div>
-      <button
-        id="tracker-enable-keys"
-        class="grow h-full"
-        @keydown="(e) => changeTrackFigureWithKeyBind(e)"
-      >
-        Enable Keys
-      </button>
+    <div id="tracker-options" class="flex w-full h-[5%] border-b border-black">
+      <input
+        type="number"
+        :value="tracker.tracks.length"
+        class="w-[15%] border-r border-black text-center text-3xl"
+        @change="(e) => changeTracksLength(e)"
+      />
+      <input
+        type="text"
+        class="grow text-center text-3xl"
+        :value="tracker.bpm.toString()"
+        @change="(e) => changeTrackerBpm(e)"
+      />
     </div>
     <!-- Tracker board -->
-    <div id="tracker-board" class="flex w-full h-[85%]">
+    <div id="tracker-board" class="flex w-full h-[95%]">
       <!-- Track list -->
-      <div id="track-list" class="flex flex-col w-[15%] border-r border-black overflow-y-scroll overflow-x-hidden">
+      <div
+        id="track-list"
+        class="flex flex-col w-[15%] border-r border-black overflow-y-scroll overflow-x-hidden"
+      >
         <div
           id="track-list-item"
           v-for="(t, idxT) in tracker.tracks"
@@ -294,13 +213,22 @@ onMounted(() => {
       </div>
       <!-- Figures -->
       <div
-        class="w-[85%] h-full border-b border-black flex flex-wrap overflow-y-scroll"
+        class="w-[85%] h-full flex flex-wrap overflow-y-scroll content-start"
       >
+        <!-- Empty button -->
+        <button
+          tabindex="0"
+          class="w-[25%] h-[25%] border-b border-r border-black text-center select-none overflow-hidden grid place-items-center bg-white"
+        >
+          <span class="text-center"> (Empty) </span>
+          <input disabled class="text-center" value="KeyQ" />
+        </button>
+        <!-- Figure buttons -->
         <button
           v-for="(f, idxF) in props.figures"
           tabindex="0"
           :key="idxF"
-          class="grow min-h-[25%] min-w-[20%] border border-black text-center select-none overflow-hidden grid place-items-center"
+          class="w-[25%] h-[25%] border-b border-r border-black text-center select-none overflow-hidden grid place-items-center"
           :style="{ 'background-color': f.color }"
         >
           <span class="text-center">
@@ -315,6 +243,19 @@ onMounted(() => {
       </div>
     </div>
   </div>
-  <!-- Visualizer/Mixer -->
-  <div class="w-full h-[50%] flex flex-wrap border-t border-black"></div>
+  <!-- ActiveTrack -->
+  <ActiveTrack
+    v-if="activeTrack"
+    :active-track="activeTrack"
+    :cursor="cursor"
+    :tracker="tracker"
+    @change-active-track="
+      (t: Track) => {
+        activeTrack = t;
+      }
+    "
+    @change-active-track-figure="
+      (e: KeyboardEvent) => handleChangeActiveTrackFigure(e)
+    "
+  ></ActiveTrack>
 </template>

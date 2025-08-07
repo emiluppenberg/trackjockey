@@ -36,7 +36,6 @@ function addFigure() {
       patterns: [],
     });
     sFigure.value = figures.value[fLen - 1];
-    console.log(sFigure.value);
   }
 }
 
@@ -80,6 +79,7 @@ function inputMeasureNotation(e: Event, m: Measure) {
         dNotes += c;
         break;
       case ":":
+        dNotes += c;
         break;
       default:
         alert("Invalid note input (character) inputmeasurenotation");
@@ -230,25 +230,43 @@ async function playSelectedFigure() {
 }
 async function loadFigures() {
   if (audioContext.value) {
-    const hihat = await fetch(
+    const hihat1 = await fetch(
       new URL("~/assets/HH_AcardeBullet11.wav/", import.meta.url).href
     )
       .then((response) => response.arrayBuffer())
       .then((arrayBuffer) => audioContext.value!.decodeAudioData(arrayBuffer)!);
 
-    const kick = await fetch(
+    const hihat2 = await fetch(
+      new URL("~/assets/HH_AcardeBullet41.wav/", import.meta.url).href
+    )
+      .then((response) => response.arrayBuffer())
+      .then((arrayBuffer) => audioContext.value!.decodeAudioData(arrayBuffer)!);
+
+    const kick1 = await fetch(
       new URL("~/assets/Tom_BleepBullet3.wav/", import.meta.url).href
     )
       .then((response) => response.arrayBuffer())
       .then((arrayBuffer) => audioContext.value!.decodeAudioData(arrayBuffer)!);
 
-    const snare = await fetch(
+    const kick2 = await fetch(
+      new URL("~/assets/BD_KastleBullet1.wav/", import.meta.url).href
+    )
+      .then((response) => response.arrayBuffer())
+      .then((arrayBuffer) => audioContext.value!.decodeAudioData(arrayBuffer)!);
+
+    const snare1 = await fetch(
       new URL("~/assets/SD_KastleBullet6.wav/", import.meta.url).href
     )
       .then((response) => response.arrayBuffer())
       .then((arrayBuffer) => audioContext.value!.decodeAudioData(arrayBuffer)!);
 
-    const arp = await fetch(
+    const snare2 = await fetch(
+      new URL("~/assets/SD_LunchBullet4.wav/", import.meta.url).href
+    )
+      .then((response) => response.arrayBuffer())
+      .then((arrayBuffer) => audioContext.value!.decodeAudioData(arrayBuffer)!);
+
+    const arp1 = await fetch(
       new URL("~/assets/ArpFallST_AcardeBullet002.wav/", import.meta.url).href
     )
       .then((response) => response.arrayBuffer())
@@ -256,10 +274,29 @@ async function loadFigures() {
 
     samples.value = [];
 
-    samples.value.push({ audioBuffer: kick, name: "kick", color: "#350EFB" });
-    samples.value.push({ audioBuffer: hihat, name: "hihat", color: "#0EFB12" });
-    samples.value.push({ audioBuffer: snare, name: "snare", color: "#E60A0A" });
-    samples.value.push({ audioBuffer: arp, name: "arp", color: "#3ADDFD" });
+    samples.value.push({ audioBuffer: kick1, name: "kick1", color: "#350EFB" });
+    samples.value.push({
+      audioBuffer: hihat1,
+      name: "hihat1",
+      color: "#0EFB12",
+    });
+    samples.value.push({
+      audioBuffer: snare1,
+      name: "snare1",
+      color: "#E60A0A",
+    });
+    samples.value.push({ audioBuffer: kick2, name: "kick2", color: "#350EFB" });
+    samples.value.push({
+      audioBuffer: hihat2,
+      name: "hihat2",
+      color: "#0EFB12",
+    });
+    samples.value.push({
+      audioBuffer: snare2,
+      name: "snare2",
+      color: "#E60A0A",
+    });
+    samples.value.push({ audioBuffer: arp1, name: "arp1", color: "#3ADDFD" });
 
     figures.value = [];
     for (let i = 0; i < 3; i++) {
@@ -268,26 +305,26 @@ async function loadFigures() {
       let snareNotes = "";
       let phraseName = "";
       let arpNotes = "";
-      let keyBind = '';
+      let keyBind = "";
 
       if (i === 0) {
         kickNotes = "5---:-13-:-5--:5---";
         hihatNotes = "5-5-5555:5-5-5-23:13575-55:135-5-5-";
         snareNotes = "--5-:-5--";
         phraseName = "sweet";
-        keyBind = 'KeyA';
+        keyBind = "KeyA";
       }
       if (i === 1) {
-        kickNotes = "5--5:--3-";
-        hihatNotes = "5-5-:-55-:123-:-35-";
-        snareNotes = "--5-:-5--";
+        kickNotes = "5-5-:5-5-";
+        hihatNotes = "-5-5:-5-5";
+        snareNotes = "--5-:--5-";
         phraseName = "damn";
-        keyBind = 'KeyS';
+        keyBind = "KeyS";
       }
       if (i === 2) {
         arpNotes = "5--5:--3-";
         phraseName = "arpy";
-        keyBind = 'KeyD';
+        keyBind = "KeyD";
       }
 
       if (kickNotes.length > 0) {
@@ -307,13 +344,18 @@ async function loadFigures() {
           fNotes: convertTo64Subdivision(snareNotes),
         };
 
-        const kickP: Pattern = { sample: samples.value[0]!, measures: [kickM] };
+        let j = 0;
+        if (i > 0){
+          j = 3;
+        }
+
+        const kickP: Pattern = { sample: samples.value[0 + j]!, measures: [kickM] };
         const hihatP: Pattern = {
-          sample: samples.value[1]!,
+          sample: samples.value[1 + j]!,
           measures: [hihatM],
         };
         const snareP: Pattern = {
-          sample: samples.value[2]!,
+          sample: samples.value[2 + j]!,
           measures: [snareM],
         };
 
@@ -333,7 +375,7 @@ async function loadFigures() {
         };
 
         const arpP: Pattern = {
-          sample: samples.value[3]!,
+          sample: samples.value[6]!,
           measures: [arpM],
         };
 
@@ -404,7 +446,7 @@ onMounted(() => {
         Tracker
       </button>
     </div>
-    <div id="app-content" class="flex w-full h-[100%]">
+    <div id="app-content" class="flex w-full h-[95%]">
       <!-- Figure editor -->
       <div
         class="flex flex-col w-[50%] h-full border-r border-black items-center"

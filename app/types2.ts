@@ -33,6 +33,7 @@ export type Measure = {
 }
 
 export type Tracker = {
+    bpm: number,
     tracks: Track[]
 }
 

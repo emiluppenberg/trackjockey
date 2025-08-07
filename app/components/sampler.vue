@@ -72,7 +72,7 @@ async function addSample() {
         v-for="(s, idxS) in props.samples"
         tabindex="0"
         :key="idxS"
-        class="grow min-h-[25%] min-w-[20%] border border-black text-center select-none overflow-hidden grid place-items-center"
+        class="grow min-h-[25%] min-w-[20%] max-h-[50%] border border-black text-center select-none overflow-hidden grid place-items-center"
         :style="{ 'background-color': s.color }"
         @click="emits('playSample', s, '1')"
       >
