@@ -4,6 +4,7 @@ const emits = defineEmits([
   "changeActiveTrack",
   "focusEnableKeys",
   "changeActiveTrackFigure",
+  'muteActiveTrackPattern'
 ]);
 const props = defineProps<{
   activeTrack: Track;
@@ -150,7 +151,7 @@ onMounted(() => {
     <div
       v-if="activeTrack?.figure"
       id="active-track-patterns"
-      class="flex flex-col w-[85%] border-l border-white bg-black"
+      class="flex flex-col w-[85%] border-l border-r border-white bg-black"
     >
       <template v-for="(p, idxP) in activeTrack.figure.patterns" :key="idxP">
         <div
@@ -159,12 +160,13 @@ onMounted(() => {
           :key="idxMc"
           class="flex border-b border-white bg-black text-white"
         >
-          <div
+          <button
             class="text-center w-[10%] overflow-x-hidden border-r border-white"
-            :style="{ color: p.sample.color }"
+            :class="{ 'bg-green-600': !p.mute, 'bg-red-600': p.mute }"
+            @click="emits('muteActiveTrackPattern', p)"
           >
             {{ p.sample.name }}
-          </div>
+          </button>
           <div
             :id="`active-track-pattern-${idxP}-measure-${idxMc}`"
             class="grow flex max-w-[45%] border-r border-white justify-between px-1"

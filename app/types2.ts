@@ -1,14 +1,7 @@
-export type AddSample = {
-    file?: File,
-    name?: string,
-    color: string 
-}
-
 export type Sample = {
     audioBuffer: AudioBuffer,
     source?: AudioBufferSourceNode,
     name: string,
-    color: string,
     keyBind?: string
 }
 
@@ -22,6 +15,7 @@ export type Figure = {
 }
 
 export type Pattern = {
+    mute: boolean,
     sample: Sample,
     measures: Measure[]
 }
@@ -38,7 +32,8 @@ export type Tracker = {
 }
 
 export type Track = {
-    figure?: Figure
+    figure?: Figure,
+    pitch: number
 }
 
 export type DragHandler = {
@@ -196,5 +191,29 @@ export function isSample(sound: Sample | Figure): sound is Sample{
 //       window.removeEventListener("mousemove", dragHandlers.value.moveHandler);
 //       window.removeEventListener("mouseup", dragHandlers.value.upHandler);
 //     }
+//   }
+// }
+
+// function startPitch(e: KeyboardEvent) {
+//   e.preventDefault();
+//   const step = 100;
+//   const element = e.target as HTMLInputElement;
+
+//   const adjustPitch = () => {
+//     let pitch = Number(element.value);
+//     if (e.code === "ArrowUp") pitch += step;
+//     if (e.code === "ArrowDown") pitch -= step;
+//     element.value = String(pitch);
+//     emits("changeActiveTrackPitch", pitch);
+//   };
+
+//   adjustPitch();
+
+//   intervalIds.value.push(window.setInterval(adjustPitch, 100));
+// }
+
+// function stopPitch() {
+//   for (let i = 0; i < intervalIds.value.length; i++) {
+//     clearInterval(intervalIds.value[i]);
 //   }
 // }

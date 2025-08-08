@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import type { AddSample, Sample } from "~/types2";
+import type { Sample } from "~/types2";
 const props = defineProps<{
   samples: Sample[];
   audioContext: AudioContext;
 }>();
-const newSample = ref<AddSample>({ color: "#000000" });
+const samples = props.samples;
+const audioContext = props.audioContext;
+
 const emits = defineEmits(["playSample"]);
 
 async function addSample() {
@@ -12,74 +14,58 @@ async function addSample() {
     document.getElementById("newsample-file-input") as HTMLInputElement
   ).files?.item(0);
 
-  if (newFile && newSample.value.color) {
-    if (props.audioContext) {
-      const audioBuffer = await props.audioContext.decodeAudioData(
-        await newFile.arrayBuffer()
-      );
-      props.samples.push({
-        audioBuffer: audioBuffer,
-        name: newSample.value.name ? newSample.value.name : newFile.name,
-        color: newSample.value.color,
-      });
-    }
+  if (newFile) {
+    const audioBuffer = await audioContext.decodeAudioData(
+      await newFile.arrayBuffer()
+    );
+    samples.push({
+      audioBuffer: audioBuffer,
+      name: newFile.name,
+    });
   }
 }
 </script>
 
 <template>
   <div class="flex flex-col w-full h-full items-center">
-    <!-- Options -->
-    <div
-      id="newsample-options"
-      class="flex w-full border border-black items-center"
-    >
-      <div id="newsample-file" class="grow flex flex-col border-l border-r">
-        <label class="text-center">File</label>
-        <input
-          id="newsample-file-input"
-          class="border-t"
-          type="file"
-          accepts="audio/*"
-          placeholder="Select file"
-        />
-      </div>
-      <div id="newsample-name" class="grow flex flex-col border-l border-r">
-        <label class="text-center">Name</label>
-        <input
-          v-model="newSample.name"
-          class="border-t text-center"
-          type="text"
-          placeholder="Enter name"
-        />
-      </div>
-      <div id="newsample-color" class="grow flex flex-col border-l border-r">
-        <label class="text-center h-[20%]">Color</label>
-        <input v-model="newSample.color" type="color" class="border-t w-full" />
-      </div>
-      <button
-        class="grow h-full border text-center bg-blue-600"
-        @click="addSample"
-      >
-        Add sample
-      </button>
-    </div>
     <!-- Samples board -->
     <div
-      class="w-full h-[50%] border-b border-black flex flex-wrap overflow-y -scroll"
+      class="w-full h-[50%] border-b border-black flex flex-wrap overflow-y-scroll content-start"
     >
-      <button
-        v-for="(s, idxS) in props.samples"
-        tabindex="0"
+      <div
+        v-for="(s, idxS) in samples"
         :key="idxS"
-        class="grow min-h-[25%] min-w-[20%] max-h-[50%] border border-black text-center select-none overflow-hidden grid place-items-center"
-        :style="{ 'background-color': s.color }"
-        @click="emits('playSample', s, '1')"
+        class="w-[25%] h-[25%] flex flex-col border-b border-r border-black text-center select-none overflow-hidden justify-start bg-blue-600"
       >
-        <span class="text-center">
-          {{ s.name }}
-        </span>
-      </button>
+        <input
+          type="text"
+          class="w-full text-center"
+          :value="s.name"
+          @change="
+            (e: Event) => {
+              s.name = (e.target as HTMLInputElement).value;
+            }
+          "
+        />
+        <button class="grow text-4xl" @click="emits('playSample', s, '5')">(->)</button>
+      </div>
+      <!-- New sample -->
+      <div class="relative w-[25%] h-[25%]">
+        <input
+          id="newsample-file-input"
+          tabindex="0"
+          class="absolute inset-0 w-full h-full opacity-0 cursor-pointer peer"
+          type="file"
+          accepts="audio/*"
+          @change="addSample"
+          @focus="console.log('focus')"
+        />
+        <div
+          class="w-full h-full border-b border-r border-black text-center select-none overflow-hidden grid place-items-center bg-blue-600 peer-focus:ring-2 peer-focus:ring-blue-600"
+        >
+          <span class="text-center text-4xl">+</span>
+        </div>
+      </div>
     </div>
     <!-- Visualizer/Mixer -->
     <div class="w-full h-[50%] flex flex-wrap"></div>
