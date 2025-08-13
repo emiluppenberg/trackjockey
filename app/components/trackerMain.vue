@@ -1,97 +1,10 @@
 <script setup lang="ts">
-import {
-  isFigure,
-  isSample,
-  sleep,
-  type Figure,
-  type Measure,
-  type Pattern,
-  type Sample,
-  type Track,
-  type Tracker,
-} from "~/types2";
-const props = defineProps<{
-  figures: Figure[];
-  samples: Sample[];
-  tracker: Tracker;
-  audioContext: AudioContext;
-}>();
-const tracker = props.tracker;
-const figures = props.figures;
-const audioContext = props.audioContext;
-
-const emit = defineEmits(["playSample", "stopSample", "changePitch"]);
-const activeTrack = ref<Track>();
-const isPlaying = ref<boolean>(false);
-const cursor = ref<number>(0);
-
-async function playTracker() {
-  isPlaying.value = true;
-  let noteLength;
-  let j = -1;
-  let i = 0;
-  while (isPlaying.value === true) {
-    const maxMeasures = tracker.tracks.map((t) => { // TODO: Math.max(tracker.tracks...)
-      if (t.figure) {
-        return t.figure.measureCount;
-      }
-      return 0;
-    });
-    const m = Math.max(...maxMeasures);
-    j++;
-    if (j === 64) {
-      j = 0;
-    }
-    cursor.value = j;
-    if (j === 0) {
-      i++;
-    }
-    if (i > m) {
-      i = 1;
-    }
-    for (let k = 0; k < tracker.tracks.length; k++) {
-      const t = tracker.tracks[k];
-      if (t) {
-        if (t.figure) {
-          const f = t.figure;
-          noteLength = (1 / (64 / 4)) * (60 / tracker.bpm) * 1000; // milliseconds
-          for (const p of f.patterns) {
-            if (p.mute) {
-              emit("stopSample", p.sample);
-            } else {
-              const m = p.measures.find((_m) => _m.index === i);
-              if (m && m.fNotes[j] !== "-") {
-                const velocity = m.fNotes[j];
-                if (
-                  velocity === "1" ||
-                  "2" ||
-                  "3" ||
-                  "4" ||
-                  "5" ||
-                  "6" ||
-                  "7" ||
-                  "8" ||
-                  "9"
-                ) {
-                  emit("playSample", p.sample, velocity, t.channel);
-                }
-                if (velocity === "X") {
-                  emit("stopSample", p.sample);
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-    if (!noteLength) {
-      await sleep(30);
-    }
-    if (noteLength) {
-      await sleep(noteLength);
-    }
-  }
-}
+import { isFigure, isSample, sleep, type Figure, type Sample } from "~/types2";
+const audioStore = useAudioStore();
+const tracker = audioStore.tracker;
+const figures = audioStore.figures;
+const audioContext = audioStore.audioContext!;
+const isKeyDown = ref<boolean>(false);
 
 function changeTrackerBpm(e: Event) {
   const element = e.target as HTMLInputElement;
@@ -126,32 +39,9 @@ function changeTracksLength(e: Event) {
         tracker.tracks.push({
           channel: channel,
           pitchProcessor: pitchProcessor,
-          pitch: 0
+          pitch: 0,
         });
       }
-    }
-
-    if (!activeTrack.value && tracker.tracks[0]){
-      activeTrack.value = tracker.tracks[0];
-    }
-  }
-}
-function handleChangeActiveTrackFigure(e: KeyboardEvent) {
-  if (e.code === "Tab") {
-    return;
-  }
-
-  e.preventDefault();
-
-  if (activeTrack.value) {
-    if (e.code === "KeyQ") {
-      activeTrack.value.figure = undefined;
-      return;
-    }
-
-    const f = figures.find((_f) => _f.keyBind === e.code);
-    if (f) {
-      activeTrack.value.figure = f;
     }
   }
 }
@@ -172,29 +62,34 @@ function changeSoundKeyBind(e: KeyboardEvent, sound: Figure | Sample) {
 }
 
 function handlePlayOrStop(e: KeyboardEvent) {
-  e.preventDefault();
-  switch (isPlaying.value) {
+  switch (audioStore.isPlaying) {
     case true:
-      isPlaying.value = false;
-      cursor.value = 0;
-      break;
+      audioStore.stopTracker();
+      return;
     case false:
-      playTracker();
-      break;
+      audioStore.playTracker();
+      return;
   }
 }
-function handleActiveTrackPitch(pitch: number) {
-  if (activeTrack.value) {
-    activeTrack.value.pitch = pitch
-    activeTrack.value.pitchProcessor.parameters.get("pitch")!.value = pitch;
-  }
-}
+
 onMounted(() => {
-  window.addEventListener("keydown", (e) => {
-    if (e.code === "Space") {
+  const spaceKeyDownListener = (e: KeyboardEvent) => {
+    if (e.code === "Space" && !isKeyDown.value) {
+      isKeyDown.value = true;
       handlePlayOrStop(e);
     }
-  });
+  }
+  const spaceKeyUpListener = (e: KeyboardEvent) => {
+    isKeyDown.value = false;
+  }
+
+  window.addEventListener("keydown", spaceKeyDownListener);
+  window.addEventListener('keyup', spaceKeyUpListener);
+
+  onBeforeUnmount(() => {
+    window.removeEventListener('keydown', spaceKeyDownListener);
+    window.removeEventListener('keyup', spaceKeyUpListener);
+  })
 });
 </script>
 
@@ -238,11 +133,6 @@ onMounted(() => {
             :key="idxT"
             class="flex flex-col border-b border-black items-start"
             :style="{ backgroundColor: t.figure?.color }"
-            @click="
-              () => {
-                activeTrack = t;
-              }
-            "
           >
             <label class="block truncate overflow-hidden">
               {{
@@ -285,28 +175,5 @@ onMounted(() => {
         </div>
       </div>
     </div>
-  </div>
-  <!-- Right -->
-  <div class="flex flex-col w-[50%] h-full">
-    <!-- ActiveTrack -->
-    <ActiveTrack
-      v-if="activeTrack"
-      :active-track="activeTrack"
-      :cursor="cursor"
-      :tracker="tracker"
-      @change-active-track="
-        (t: Track) => {
-          activeTrack = t;
-        }
-      "
-      @change-active-track-figure="
-        (e: KeyboardEvent) => handleChangeActiveTrackFigure(e)
-      "
-      @mute-active-track-pattern="
-        (p: Pattern) => {
-          p.mute = !p.mute;
-        }
-      "
-    ></ActiveTrack>
   </div>
 </template>

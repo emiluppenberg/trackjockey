@@ -6,20 +6,14 @@ import {
   type Pattern,
   type Sample,
 } from "~/types2";
+const audioStore = useAudioStore()
 
-const props = defineProps<{
-  samples: Sample[];
-  audioContext: AudioContext;
-  figures: Figure[];
-}>();
-const samples = props.samples;
-const audioContext = props.audioContext;
-const figures = props.figures;
+const samples = audioStore.samples;
+const figures = audioStore.figures;
+const audioContext = audioStore.audioContext!;
 
 const isPlaying = ref<boolean>(false);
 const sFigure = ref<Figure>();
-
-const emits = defineEmits(["playSample", "stopSample"]);
 
 function addPattern() {
   if (sFigure.value) {
@@ -196,15 +190,20 @@ function changeFigureMeasures(e: Event) {
 async function playSelectedFigure() {
   if (sFigure.value && sFigure.value.measureCount > 0) {
     isPlaying.value = true;
-    while (isPlaying.value === true) {
+    const channel = new ChannelMergerNode(audioContext);
+    channel.connect(audioContext.destination);
+
+    while (true) {
       const noteLength = // Note length in milliseconds
         (1 / (64 / 4)) * // One quarter note (Measures always noted as 64/4)
         (60 / sFigure.value.tempo) * // BPM (Quarter notes/Minute)
         1000; // milliseconds
+
       for (let i = 1; i <= sFigure.value.measureCount; i++) {
         for (let j = 0; j < 64; j++) {
           for (const p of sFigure.value.patterns) {
             const m = p.measures.find((_m) => _m.index === i);
+
             if (m && m.fNotes[j] !== "-") {
               const c = m.fNotes[j]!;
               if (
@@ -218,14 +217,17 @@ async function playSelectedFigure() {
                 "8" ||
                 "9"
               ) {
-                emits("playSample", p.sample, c);
+                audioStore.playSample(p.sample, c, channel)
               }
               if (c === "X") {
-                emits("stopSample", p.sample);
+                audioStore.stopSample(p.sample)
               }
             }
           }
           await sleep(noteLength);
+          if (!isPlaying.value){
+            return;
+          }
         }
       }
     }
@@ -551,14 +553,5 @@ onMounted(() => {
         Add samples to create patterns
       </button>
     </div>
-  </div>
-  <!-- Right -->
-  <div class="flex flex-col w-[50%] h-full items-center">
-    <Sampler
-      v-if="audioContext"
-      :samples="samples"
-      :audio-context="audioContext"
-      @play-sample="(s: Sample, c: string) => emits('playSample', s, c)"
-    ></Sampler>
   </div>
 </template>

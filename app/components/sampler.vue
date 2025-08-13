@@ -1,11 +1,8 @@
 <script setup lang="ts">
 import type { Sample } from "~/types2";
-const props = defineProps<{
-  samples: Sample[];
-  audioContext: AudioContext;
-}>();
-const samples = props.samples;
-const audioContext = props.audioContext;
+const audioStore = useAudioStore();
+const samples = audioStore.samples;
+const audioContext = audioStore.audioContext!;
 
 const emits = defineEmits(["playSample"]);
 
@@ -27,7 +24,7 @@ async function addSample() {
 </script>
 
 <template>
-  <div class="flex flex-col w-full h-full items-center">
+  <div class="flex flex-col w-[50%] h-full items-center">
     <!-- Samples board -->
     <div
       class="w-full h-[50%] border-b border-black flex flex-wrap overflow-y-scroll content-start"

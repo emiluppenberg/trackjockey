@@ -3,7 +3,7 @@ import type { Track } from "~/types2";
 const props = defineProps<{
   activeTrack: Track;
 }>();
-const activeTrack = props.activeTrack;
+const activeTrack = ref<Track>();
 const emits = defineEmits(["changeActiveTrackPitch"]);
 
 function onChangePitch(e: Event) {
@@ -12,20 +12,30 @@ function onChangePitch(e: Event) {
   emits("changeActiveTrackPitch", pitch);
   element.select();
 }
+
+watch(
+  () => props.activeTrack,
+  (newTrack) => {
+    activeTrack.value = newTrack;
+  }
+);
 </script>
 
 <template>
-    <div
-      id="active-track-mixer-container"
-      class="h-full border-l border-white bg-blue-600"
-    >
-      <input
-        id="active-track-pitch"
-        type="number"
-        :value="activeTrack.pitch"
-        class="w-[20%] h-[25%] border-b border-r border-white"
-        @change="(e) => onChangePitch(e)"
-      />
-      <button class="bg-white" @click="console.log(activeTrack.figure)">Pitch</button>
-    </div>
+  <div
+    v-if="activeTrack"
+    id="active-track-mixer-container"
+    class="h-full border-l border-white bg-blue-600"
+  >
+    <input
+      id="active-track-pitch"
+      type="number"
+      :value="activeTrack.pitch"
+      class="w-[20%] h-[25%] border-b border-r border-white"
+      @change="(e) => onChangePitch(e)"
+    />
+    <button class="bg-white" @click="console.log(activeTrack.pitch)">
+      Pitch
+    </button>
+  </div>
 </template>

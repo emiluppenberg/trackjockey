@@ -1,16 +1,11 @@
 <script setup lang="ts">
 import type { Measure, Track, Tracker } from "~/types2";
-const emits = defineEmits([
-  "changeActiveTrack",
-  "focusEnableKeys",
-  "changeActiveTrackFigure",
-  "muteActiveTrackPattern",
-]);
-const props = defineProps<{
-  activeTrack: Track;
-  tracker: Tracker;
-  cursor: number;
-}>();
+import ActiveTrackMixer from "./activeTrackMixer.vue";
+const audioStore = useAudioStore();
+const tracks = audioStore.tracker.tracks;
+const figures = audioStore.figures;
+const cursor = audioStore.cursor;
+const activeTrack = ref<Track>();
 
 const isChangingActiveTrack = ref<boolean>(false);
 
@@ -18,9 +13,9 @@ function inputActiveTrack(e: Event) {
   const element = e.target as HTMLInputElement;
   const idxT = Number(element.value) - 1;
   element.style.color = "black";
-  const t = props.tracker.tracks[idxT];
+  const t = tracks[idxT];
   if (t) {
-    emits("changeActiveTrack", t);
+    activeTrack.value = t;
   } else {
     element.style.color = "red";
   }
@@ -28,18 +23,18 @@ function inputActiveTrack(e: Event) {
 function changeActiveTrack(e: Event) {
   const element = e.target as HTMLInputElement;
   const idxT = Number(element.value) - 1;
-  const t = props.tracker.tracks[idxT];
+  const t = tracks[idxT];
   if (t) {
-    emits("changeActiveTrack", t);
+    activeTrack.value = t;
     return;
   } else {
     element.value = (
-      props.tracker.tracks.indexOf(props.activeTrack) + 1
+      tracks.indexOf(activeTrack.value!) + 1
     ).toString();
     element.style.color = "black";
   }
 }
-function handleActiveTrackFocus(e: KeyboardEvent) {
+function activeTrackFocus(e: KeyboardEvent) {
   e.preventDefault();
   isChangingActiveTrack.value = !isChangingActiveTrack.value;
   switch (isChangingActiveTrack.value) {
@@ -50,10 +45,10 @@ function handleActiveTrackFocus(e: KeyboardEvent) {
       }
       break;
     case false:
-      handleEnableKeysFocus(e);
+      enableKeysFocus(e);
   }
 }
-function handleEnableKeysFocus(e: KeyboardEvent) {
+function enableKeysFocus(e: KeyboardEvent) {
   e.preventDefault();
   if (isChangingActiveTrack.value) {
     isChangingActiveTrack.value = !isChangingActiveTrack.value;
@@ -61,6 +56,25 @@ function handleEnableKeysFocus(e: KeyboardEvent) {
   const enableKeysElement = document.getElementById("active-track-enable-keys");
   if (enableKeysElement) {
     enableKeysElement.focus();
+  }
+}
+function changeActiveTrackFigure(e: KeyboardEvent) {
+  if (e.code === "Tab") {
+    return;
+  }
+
+  e.preventDefault();
+
+  if (activeTrack.value) {
+    if (e.code === "KeyQ") {
+      activeTrack.value.figure = undefined;
+      return;
+    }
+
+    const f = figures.find((_f) => _f.keyBind === e.code);
+    if (f) {
+      activeTrack.value.figure = f;
+    }
   }
 }
 function selectAllText(e: Event) {
@@ -88,25 +102,32 @@ function getCursorForDNotes(m: Measure, idxC: number): boolean {
   const fLen = 64 / dNotesClean.length;
   const nextNoteIdx = currentNoteIdx + 1;
 
-  if (props.cursor === currentNoteIdx * fLen) {
+  if (cursor === currentNoteIdx * fLen) {
     return true;
   }
   if (
-    props.cursor < nextNoteIdx * fLen &&
-    props.cursor > currentNoteIdx * fLen
+    cursor < nextNoteIdx * fLen &&
+    cursor > currentNoteIdx * fLen
   ) {
     return true;
   }
 
   return false;
 }
+
+function handleChangeActiveTrackPitch(pitch: number) {
+  if (activeTrack.value){
+    activeTrack.value.pitch = pitch;
+    activeTrack.value.pitchProcessor.parameters.get('pitch')!.value = pitch;
+  }
+}
 onMounted(() => {
   window.addEventListener("keydown", (e) => {
     if (e.code === "BracketLeft") {
-      handleActiveTrackFocus(e);
+      activeTrackFocus(e);
     }
     if (e.code === "BracketRight") {
-      handleEnableKeysFocus(e);
+      enableKeysFocus(e);
     }
   });
 });
@@ -136,13 +157,13 @@ onMounted(() => {
         @input="(e) => inputActiveTrack(e)"
         @change="(e) => changeActiveTrack(e)"
         @focus="(e) => selectAllText(e)"
-        @keydown.enter="(e) => handleActiveTrackFocus(e)"
-        :style="{ backgroundColor: activeTrack.figure?.color }"
+        @keydown.enter="(e) => activeTrackFocus(e)"
+        :style="{ backgroundColor: activeTrack?.figure?.color }"
       />
       <button
         id="active-track-enable-keys"
         class="w-1/3 text-4xl"
-        @keydown="(e: KeyboardEvent) => emits('changeActiveTrackFigure', e)"
+        @keydown="(e: KeyboardEvent) => changeActiveTrackFigure(e)"
       >
         (->)
       </button>
@@ -162,7 +183,7 @@ onMounted(() => {
           <button
             class="text-center w-[10%] overflow-x-hidden border-r border-white"
             :class="{ 'bg-green-600': !p.mute, 'bg-red-600': p.mute }"
-            @click="emits('muteActiveTrackPattern', p)"
+            @click="() => {p.mute = !p.mute}"
           >
             {{ p.sample.name }}
           </button>
@@ -188,7 +209,7 @@ onMounted(() => {
       </template>
     </div>
     <div id="active-track-mixer" class="w-full h-full">
-      <active-track-mixer :active-track="activeTrack"></active-track-mixer>
+      <ActiveTrackMixer v-if="activeTrack" :active-track="activeTrack" @change-active-track-pitch="(pitch: number) => handleChangeActiveTrackPitch(pitch)"></ActiveTrackMixer>
     </div>
   </div>
 </template>
