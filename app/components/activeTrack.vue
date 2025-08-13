@@ -4,7 +4,7 @@ const emits = defineEmits([
   "changeActiveTrack",
   "focusEnableKeys",
   "changeActiveTrackFigure",
-  'muteActiveTrackPattern'
+  "muteActiveTrackPattern",
 ]);
 const props = defineProps<{
   activeTrack: Track;
@@ -115,43 +115,42 @@ onMounted(() => {
 <template>
   <div
     id="active-track"
-    class="w-full h-[20%] flex overflow-hidden border border-black"
+    class="w-full h-full flex flex-col overflow-hidden border border-black"
     :style="{ backgroundColor: activeTrack?.figure?.color }"
   >
+  <button class="w-full border-b border-black" @click="console.log(activeTrack)">click</button>
     <div
       id="active-track-options"
-      class="flex flex-col w-[15%] border-r border-black h-full items-center"
+      class="flex w-full h-[5%] border-r border-black"
     >
-      <div id="active-track-name" class="h-[30%] flex flex-col justify-evenly">
-        <h2>Activetrack:</h2>
-        <p id="active-track-name" class="text-center">
-          {{ activeTrack?.figure?.name }}
-        </p>
+      <div
+        id="active-track-name"
+        class="w-1/3 text-4xl text-center border-r border-black"
+      >
+        {{ activeTrack?.figure?.name }}
       </div>
-      <div class="grow flex border-t border-black">
-        <input
-          id="active-track-input"
-          type="number"
-          class="text-center w-[50%] text-4xl border-r border-black"
-          @input="(e) => inputActiveTrack(e)"
-          @change="(e) => changeActiveTrack(e)"
-          @focus="(e) => selectAllText(e)"
-          @keydown.enter="(e) => handleActiveTrackFocus(e)"
-          :style="{ backgroundColor: activeTrack.figure?.color }"
-        />
-        <button
-          id="active-track-enable-keys"
-          class="w-[50%] text-4xl"
-          @keydown="(e: KeyboardEvent) => emits('changeActiveTrackFigure', e)"
-        >
-          (->)
-        </button>
-      </div>
+      <input
+        id="active-track-input"
+        type="number"
+        class="w-1/3 border-r border-black text-center text-4xl"
+        @input="(e) => inputActiveTrack(e)"
+        @change="(e) => changeActiveTrack(e)"
+        @focus="(e) => selectAllText(e)"
+        @keydown.enter="(e) => handleActiveTrackFocus(e)"
+        :style="{ backgroundColor: activeTrack.figure?.color }"
+      />
+      <button
+        id="active-track-enable-keys"
+        class="w-1/3 text-4xl"
+        @keydown="(e: KeyboardEvent) => emits('changeActiveTrackFigure', e)"
+      >
+        (->)
+      </button>
     </div>
     <div
       v-if="activeTrack?.figure"
       id="active-track-patterns"
-      class="flex flex-col w-[85%] border-l border-r border-white bg-black"
+      class="flex flex-col w-full h-[15%] border-l border-r border-white bg-black overflow-y-scroll"
     >
       <template v-for="(p, idxP) in activeTrack.figure.patterns" :key="idxP">
         <div
@@ -187,6 +186,9 @@ onMounted(() => {
           </div>
         </div>
       </template>
+    </div>
+    <div id="active-track-mixer" class="w-full h-full">
+      <active-track-mixer :active-track="activeTrack"></active-track-mixer>
     </div>
   </div>
 </template>

@@ -1,20 +1,16 @@
 <script setup lang="ts">
 import Sampler from "~/components/sampler.vue";
-import type {
-  Sample,
-  Figure,
-  Pattern,
-  Measure,
-  DragHandler,
-  Tracker,
-} from "~/types2";
+import type { Sample, Figure, Tracker } from "~/types2";
 const audioContext = ref<AudioContext>();
 const samples = ref<Sample[]>([]);
 const figures = ref<Figure[]>([]);
 const sComponent = ref<string>("figures");
-const tracker = ref<Tracker>({ bpm: 120, tracks: [{ figure: undefined, pitch: 0 }] });
+const tracker = ref<Tracker>({
+  bpm: 120,
+  tracks: [],
+});
 
-async function playSample(s: Sample, velocity: string, pitch: number) {
+async function playSample(s: Sample, velocity: string, channel: ChannelMergerNode) {
   if (audioContext.value) {
     if (Number(velocity)) {
       const gain = (Number(velocity) * 2) / 10;
@@ -22,8 +18,8 @@ async function playSample(s: Sample, velocity: string, pitch: number) {
       gainNode.gain.value = gain;
       s.source = audioContext.value.createBufferSource();
       s.source.buffer = s.audioBuffer;
-      s.source.detune.value = pitch;
-      s.source.connect(gainNode).connect(audioContext.value.destination);
+      s.source
+        .connect(channel)
       s.source.start();
     }
   }
@@ -36,8 +32,12 @@ async function stopSample(s: Sample) {
     }
   }
 }
-onMounted(() => {
+onMounted(async () => {
+  // Async causes unrender of figures/sampler/tracker at loadup
   audioContext.value = new AudioContext();
+  await audioContext.value.audioWorklet.addModule(
+    "/pitch-processor.js"
+  );
 
   figures.value.push({
     name: "",
@@ -71,21 +71,22 @@ onMounted(() => {
         :samples="samples"
         :figures="figures"
         :audio-context="audioContext"
-        @play-sample="(s: Sample, v: string) => playSample(s, v, 0)"
+        @play-sample="(s: Sample, v: string, c: ChannelMergerNode) => playSample(s, v, c)"
         @stop-sample="(s: Sample) => stopSample(s)"
       ></Figures>
       <Sampler
         v-if="audioContext && sComponent === 'sampler'"
         :samples="samples"
         :audio-context="audioContext"
-        @play-sample="(s: Sample, v: string) => playSample(s, v, 0)"
+        @play-sample="(s: Sample, v: string, c: ChannelMergerNode) => playSample(s, v, c)"
       ></Sampler>
       <Tracker
         v-if="audioContext && sComponent === 'tracker'"
         :figures="figures"
         :samples="samples"
         :tracker="tracker"
-        @play-sample="(s: Sample, v: string, p: number) => playSample(s, v, p)"
+        :audio-context="audioContext"
+        @play-sample="(s: Sample, v: string, c: ChannelMergerNode) => playSample(s, v, c)"
         @stop-sample="(s: Sample) => stopSample(s)"
       >
       </Tracker>

@@ -14,14 +14,15 @@ const props = defineProps<{
   figures: Figure[];
   samples: Sample[];
   tracker: Tracker;
+  audioContext: AudioContext;
 }>();
 const tracker = props.tracker;
 const figures = props.figures;
+const audioContext = props.audioContext;
 
-const emit = defineEmits(["playSample", "stopSample"]);
-const activeTrack = ref<Track>({ figure: undefined, pitch: 0 });
+const emit = defineEmits(["playSample", "stopSample", "changePitch"]);
+const activeTrack = ref<Track>();
 const isPlaying = ref<boolean>(false);
-const isChangingActiveTrack = ref<boolean>(false);
 const cursor = ref<number>(0);
 
 async function playTracker() {
@@ -30,7 +31,7 @@ async function playTracker() {
   let j = -1;
   let i = 0;
   while (isPlaying.value === true) {
-    const maxMeasures = tracker.tracks.map((t) => {
+    const maxMeasures = tracker.tracks.map((t) => { // TODO: Math.max(tracker.tracks...)
       if (t.figure) {
         return t.figure.measureCount;
       }
@@ -72,7 +73,7 @@ async function playTracker() {
                   "8" ||
                   "9"
                 ) {
-                  emit("playSample", p.sample, velocity, t.pitch);
+                  emit("playSample", p.sample, velocity, t.channel);
                 }
                 if (velocity === "X") {
                   emit("stopSample", p.sample);
@@ -101,18 +102,37 @@ function changeTrackerBpm(e: Event) {
 }
 function changeTracksLength(e: Event) {
   const value = (e.target as HTMLInputElement).value;
+
   if (Number(value)) {
     const len = Number(value);
+
     if (tracker.tracks.length > len) {
-      console.log(len);
       for (let i = tracker.tracks.length; i > len; i--) {
         tracker.tracks.pop();
       }
     }
+
     if (tracker.tracks.length < len) {
       for (let i = tracker.tracks.length; i < len; i++) {
-        tracker.tracks.push({ pitch: 0 });
+        const pitchProcessor = new AudioWorkletNode(
+          audioContext,
+          "pitch-processor"
+        );
+        pitchProcessor.connect(audioContext.destination);
+
+        const channel = new ChannelMergerNode(audioContext);
+        channel.connect(pitchProcessor);
+
+        tracker.tracks.push({
+          channel: channel,
+          pitchProcessor: pitchProcessor,
+          pitch: 0
+        });
       }
+    }
+
+    if (!activeTrack.value && tracker.tracks[0]){
+      activeTrack.value = tracker.tracks[0];
     }
   }
 }
@@ -120,12 +140,15 @@ function handleChangeActiveTrackFigure(e: KeyboardEvent) {
   if (e.code === "Tab") {
     return;
   }
+
   e.preventDefault();
+
   if (activeTrack.value) {
     if (e.code === "KeyQ") {
       activeTrack.value.figure = undefined;
       return;
     }
+
     const f = figures.find((_f) => _f.keyBind === e.code);
     if (f) {
       activeTrack.value.figure = f;
@@ -137,7 +160,9 @@ function changeSoundKeyBind(e: KeyboardEvent, sound: Figure | Sample) {
   if (e.code === "Slash" || e.code === "Period" || e.code === "Tab") {
     return;
   }
+
   e.preventDefault();
+
   if (isFigure(sound)) {
     sound.keyBind = e.code;
   }
@@ -158,8 +183,13 @@ function handlePlayOrStop(e: KeyboardEvent) {
       break;
   }
 }
+function handleActiveTrackPitch(pitch: number) {
+  if (activeTrack.value) {
+    activeTrack.value.pitch = pitch
+    activeTrack.value.pitchProcessor.parameters.get("pitch")!.value = pitch;
+  }
+}
 onMounted(() => {
-  activeTrack.value = tracker.tracks[0]!;
   window.addEventListener("keydown", (e) => {
     if (e.code === "Space") {
       handlePlayOrStop(e);
@@ -175,7 +205,7 @@ onMounted(() => {
     <div
       id="tracker-ui"
       v-if="tracker"
-      class="flex flex-col w-full overflow-hidden h-[80%] border border-black"
+      class="flex flex-col w-full overflow-hidden h-full border border-black"
     >
       <!-- Options -->
       <div
@@ -208,6 +238,11 @@ onMounted(() => {
             :key="idxT"
             class="flex flex-col border-b border-black items-start"
             :style="{ backgroundColor: t.figure?.color }"
+            @click="
+              () => {
+                activeTrack = t;
+              }
+            "
           >
             <label class="block truncate overflow-hidden">
               {{
@@ -250,6 +285,9 @@ onMounted(() => {
         </div>
       </div>
     </div>
+  </div>
+  <!-- Right -->
+  <div class="flex flex-col w-[50%] h-full">
     <!-- ActiveTrack -->
     <ActiveTrack
       v-if="activeTrack"
@@ -270,17 +308,5 @@ onMounted(() => {
         }
       "
     ></ActiveTrack>
-  </div>
-  <!-- Right -->
-  <div class="flex flex-col w-[50%] h-full items-center">
-    <!-- Visualizer/Mixer -->
-    <TrackerMixer
-      :active-track="activeTrack"
-      @change-active-track-pitch="
-        (pitch: number) => {
-          activeTrack.pitch = pitch;
-        }
-      "
-    ></TrackerMixer>
   </div>
 </template>

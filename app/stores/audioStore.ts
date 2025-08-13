@@ -1,7 +1,9 @@
-import type { AudioSample } from "~/types";
+export const useAudioStore = defineStore("audioStore", () => {
+  const audioContext = ref<AudioContext>();
 
-export const useAudioStore = defineStore('audioStore', () => {
-    const audioLoops = ref<AudioSample[]>([]);
-
-    return { audioLoops }
-})
+  onMounted(async () => {
+    audioContext.value = new AudioContext();
+    await audioContext.value.audioWorklet.addModule("/pitch-processor.js");
+  });
+  return { audioContext };
+});

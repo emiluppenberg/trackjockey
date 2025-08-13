@@ -33,6 +33,8 @@ export type Tracker = {
 
 export type Track = {
     figure?: Figure,
+    channel: ChannelMergerNode,
+    pitchProcessor: AudioWorkletNode,
     pitch: number
 }
 

@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "nuxt build",
+    "build:worklet": "vite build --config vite.worklet.config.js",
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
@@ -11,6 +12,7 @@
   },
   "dependencies": {
     "@pinia/nuxt": "^0.11.2",
+    "fft.js": "^4.0.4",
     "nuxt": "^4.0.0",
     "pinia": "^3.0.3",
     "tone": "^15.1.22",
