@@ -23,19 +23,21 @@ export const useAudioStore = defineStore("audioStore", () => {
 
   async function playSample(
     s: Sample,
-    velocity: string,
+    velocity: number,
+    melody: number,
     channel: ChannelMergerNode
   ) {
     if (audioContext.value) {
-      if (Number(velocity)) {
-        const gain = (Number(velocity) * 2) / 10;
-        const gainNode = audioContext.value.createGain();
-        gainNode.gain.value = gain;
-        s.source = audioContext.value.createBufferSource();
-        s.source.buffer = s.audioBuffer;
-        s.source.connect(channel);
-        s.source.start();
-      }
+      const gain = (velocity * 2) / 10;
+      const detune = melody * 100;
+
+      const gainNode = audioContext.value.createGain();
+      gainNode.gain.value = gain;
+      s.source = audioContext.value.createBufferSource();
+      s.source.buffer = s.audioBuffer;
+      s.source.detune.value = detune;
+      s.source.connect(channel);
+      s.source.start();
     }
   }
   async function stopSample(s: Sample) {
@@ -85,21 +87,13 @@ export const useAudioStore = defineStore("audioStore", () => {
               } else {
                 const m = p.measures.find((_m) => _m.index === i);
                 if (m && m.fNotes[j] !== "-") {
-                  const velocity = m.fNotes[j];
-                  if (
-                    velocity === "1" ||
-                    "2" ||
-                    "3" ||
-                    "4" ||
-                    "5" ||
-                    "6" ||
-                    "7" ||
-                    "8" ||
-                    "9"
-                  ) {
-                    playSample(p.sample, velocity!, t.channel);
+                  const velocity = Number(m.fNotes[j]);
+                  const melody = Number(m.mNotes[j]) || 0;
+
+                  if (velocity) {
+                    playSample(p.sample, velocity, melody, t.channel);
                   }
-                  if (velocity === "X") {
+                  if (m.fNotes === "X") {
                     stopSample(p.sample);
                   }
                 }

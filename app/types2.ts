@@ -22,7 +22,8 @@ export type Pattern = {
 
 export type Measure = {
     index: number,
-    dNotes: string,
+    rNotes: string,
+    mNotes: string[],
     fNotes: string
 }
 
@@ -51,6 +52,10 @@ export function isFigure(sound: Figure | Sample): sound is Figure{
 }
 export function isSample(sound: Sample | Figure): sound is Sample{
     return (sound as Sample).audioBuffer !== undefined;
+}
+export function selectAllText(e: Event) {
+  const target = e.target as HTMLInputElement;
+  target.select();
 }
 // Ignore below
 

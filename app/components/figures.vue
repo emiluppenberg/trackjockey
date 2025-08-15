@@ -1,17 +1,21 @@
 <script setup lang="ts">
+import { flatMap } from "lodash-es";
+import { renderToSimpleStream } from "vue/server-renderer";
 import {
+  selectAllText,
   sleep,
   type Figure,
   type Measure,
   type Pattern,
   type Sample,
 } from "~/types2";
-const audioStore = useAudioStore()
+const audioStore = useAudioStore();
 
 const samples = audioStore.samples;
 const figures = audioStore.figures;
 const audioContext = audioStore.audioContext!;
 
+const isEditingMeasure = ref<Measure>();
 const isPlaying = ref<boolean>(false);
 const sFigure = ref<Figure>();
 
@@ -39,55 +43,56 @@ function addFigure() {
 
 function inputMeasureNotation(e: Event, m: Measure) {
   const value = (e.target as HTMLInputElement).value.toUpperCase();
-  let dNotes: string = "";
+  let rNotes: string = "";
   for (let i = 0; i < value.length; i++) {
     const c = value.charAt(i);
     switch (c) {
       case "1":
-        dNotes += c;
+        rNotes += c;
         break;
       case "2":
-        dNotes += c;
+        rNotes += c;
         break;
       case "3":
-        dNotes += c;
+        rNotes += c;
         break;
       case "4":
-        dNotes += c;
+        rNotes += c;
         break;
       case "5":
-        dNotes += c;
+        rNotes += c;
         break;
       case "6":
-        dNotes += c;
+        rNotes += c;
         break;
       case "7":
-        dNotes += c;
+        rNotes += c;
         break;
       case "8":
-        dNotes += c;
+        rNotes += c;
         break;
       case "9":
-        dNotes += c;
+        rNotes += c;
         break;
       case "X":
-        dNotes += c;
+        rNotes += c;
         break;
       case "-":
-        dNotes += c;
+        rNotes += c;
         break;
       case ":":
-        dNotes += c;
+        rNotes += c;
         break;
       default:
         alert("Invalid note input (character) inputmeasurenotation");
         return;
     }
   }
-  m.dNotes = dNotes;
-  m.fNotes = convertTo64Subdivision(dNotes);
+  m.rNotes = rNotes;
+  m.fNotes = convertTo64Rhythm(rNotes);
+  m.mNotes = initialize64Melody(rNotes);
 }
-function convertTo64Subdivision(notes: string): string {
+function convertTo64Rhythm(notes: string): string {
   const fLen = 64 / notes.length;
   let fNotes = "";
   let fIdx = 0;
@@ -145,6 +150,86 @@ function convertTo64Subdivision(notes: string): string {
   }
   return fNotes;
 }
+function initialize64Melody(rNotes: string): string[] {
+  const fLen = 64 / rNotes.length;
+  let mNotes: string[] = [];
+  let fIdx = 0;
+
+  const formatNotes = (c: string) => {
+    if (Number(c)) {
+      mNotes.push("0");
+    } else {
+      mNotes.push(c);
+    }
+
+    for (let j = fIdx + 1; j < fLen + fIdx; j++) {
+      mNotes.push("-");
+    }
+    fIdx += fLen;
+  };
+
+  for (let i = 0; i < rNotes.length; i++) {
+    const c = rNotes.charAt(i);
+    switch (c) {
+      case "1":
+        formatNotes(c);
+        break;
+      case "2":
+        formatNotes(c);
+        break;
+      case "3":
+        formatNotes(c);
+        break;
+      case "4":
+        formatNotes(c);
+        break;
+      case "5":
+        formatNotes(c);
+        break;
+      case "6":
+        formatNotes(c);
+        break;
+      case "7":
+        formatNotes(c);
+        break;
+      case "8":
+        formatNotes(c);
+        break;
+      case "9":
+        formatNotes(c);
+        break;
+      case "X":
+        formatNotes(c);
+        break;
+      case "-":
+        formatNotes(c);
+        break;
+      case ":":
+        break;
+      default:
+        alert("Invalid note input (character) conversion");
+        return [];
+    }
+  }
+  return mNotes;
+}
+function getMelodyIndex(idxC: number, rNotes: string): number {
+  let idxM = 0;
+  let _rNotes = "";
+
+  for (let i = 0; i < idxC; i++) {
+    const c = rNotes.charAt(i);
+    if (c !== ":") idxM++;
+  }
+
+  for (let i = 0; i < rNotes.length; i++) {
+    const c = rNotes.charAt(i);
+    if (c !== ":") _rNotes += c;
+  }
+
+  const fLen = 64 / _rNotes.length;
+  return fLen * idxM;
+}
 
 function changeFigureTempo(e: Event) {
   if (sFigure.value) {
@@ -190,8 +275,13 @@ function changeFigureMeasures(e: Event) {
 async function playSelectedFigure() {
   if (sFigure.value && sFigure.value.measureCount > 0) {
     isPlaying.value = true;
-    const channel = new ChannelMergerNode(audioContext);
-    channel.connect(audioContext.destination);
+    const channel = audioContext.createChannelMerger(sFigure.value.patterns.length);
+    const panner = audioContext.createStereoPanner();
+    panner.pan.value = 0.5;
+
+    channel
+      .connect(panner)
+      .connect(audioContext.destination);
 
     while (true) {
       const noteLength = // Note length in milliseconds
@@ -205,27 +295,19 @@ async function playSelectedFigure() {
             const m = p.measures.find((_m) => _m.index === i);
 
             if (m && m.fNotes[j] !== "-") {
-              const c = m.fNotes[j]!;
-              if (
-                c === "1" ||
-                "2" ||
-                "3" ||
-                "4" ||
-                "5" ||
-                "6" ||
-                "7" ||
-                "8" ||
-                "9"
-              ) {
-                audioStore.playSample(p.sample, c, channel)
+              const velocity = Number(m.fNotes[j]);
+              const melody = Number(m.mNotes[j]) || 0;
+
+              if (velocity) {
+                audioStore.playSample(p.sample, velocity, melody, channel);
               }
-              if (c === "X") {
-                audioStore.stopSample(p.sample)
+              if (m.fNotes[j] === "X") {
+                audioStore.stopSample(p.sample);
               }
             }
           }
           await sleep(noteLength);
-          if (!isPlaying.value){
+          if (!isPlaying.value) {
             return;
           }
         }
@@ -335,18 +417,21 @@ async function loadFigures() {
     if (kickNotes.length > 0) {
       const kickM: Measure = {
         index: 1,
-        dNotes: kickNotes,
-        fNotes: convertTo64Subdivision(kickNotes),
+        rNotes: kickNotes,
+        mNotes: initialize64Melody(kickNotes),
+        fNotes: convertTo64Rhythm(kickNotes),
       };
       const hihatM: Measure = {
         index: 1,
-        dNotes: hihatNotes,
-        fNotes: convertTo64Subdivision(hihatNotes),
+        rNotes: hihatNotes,
+        mNotes: initialize64Melody(hihatNotes),
+        fNotes: convertTo64Rhythm(hihatNotes),
       };
       const snareM: Measure = {
         index: 1,
-        dNotes: snareNotes,
-        fNotes: convertTo64Subdivision(snareNotes),
+        rNotes: snareNotes,
+        mNotes: initialize64Melody(snareNotes),
+        fNotes: convertTo64Rhythm(snareNotes),
       };
 
       let j = 0;
@@ -381,8 +466,9 @@ async function loadFigures() {
     } else {
       const arpM: Measure = {
         index: 1,
-        dNotes: arpNotes,
-        fNotes: convertTo64Subdivision(arpNotes),
+        rNotes: arpNotes,
+        mNotes: initialize64Melody(arpNotes),
+        fNotes: convertTo64Rhythm(arpNotes),
       };
 
       const arpP: Pattern = {
@@ -402,6 +488,18 @@ async function loadFigures() {
     }
   }
   sFigure.value = figures[0];
+}
+
+function handleEditMeasureRhythm(idxP: number, idxMc: number, m: Measure) {
+  isEditingMeasure.value = m;
+  const textarea = document.getElementById(
+    `pattern-${idxP}-measure-${idxMc}-rhythm-textarea`
+  ) as HTMLTextAreaElement;
+
+  if (textarea) {
+    textarea.classList.remove("hidden");
+    textarea.focus();
+  }
 }
 onMounted(() => {
   sFigure.value = figures[0];
@@ -488,13 +586,13 @@ onMounted(() => {
     >
       <div
         id="pattern"
-        v-for="(pa, idxPa) in sFigure.patterns"
+        v-for="(p, idxP) in sFigure.patterns"
         class="w-full h-[5%] flex border items-center"
       >
         <!-- Pattern sample -->
         <div id="pattern-sample" class="w-[10%] h-full flex flex-col">
           <select
-            v-model="pa.sample"
+            v-model="p.sample"
             class="w-full h-full border text-center bg-blue-600"
           >
             <option
@@ -516,25 +614,78 @@ onMounted(() => {
           :style="{ width: 100 / sFigure.measureCount + '%' }"
         >
           <button
-            v-if="!pa.measures.some((m) => m.index === idxMc)"
+            v-if="!p.measures.some((m) => m.index === idxMc)"
             class="w-full h-full border"
-            @click="pa.measures.push({ index: idxMc, dNotes: '', fNotes: '' })"
+            @click="
+              p.measures.push({
+                index: idxMc,
+                rNotes: '',
+                mNotes: [],
+                fNotes: '',
+              })
+            "
           >
             +
           </button>
-          <template v-for="m in pa.measures">
+          <template v-for="m in p.measures">
             <div
               :id="`pattern-measure-${m.index}`"
               v-if="m.index === idxMc"
               class="w-full h-full flex flex-col"
             >
-              <textarea
-                type="text"
-                class="w-full h-full text-center content-center"
-                :value="m.dNotes"
-                @change="(e) => inputMeasureNotation(e, m)"
-                wrap="soft"
-              ></textarea>
+              <div class="flex w-full h-[50%] border-b items-start">
+                <div
+                  tabindex="0"
+                  class="w-full h-full flex justify-evenly"
+                  :class="{ hidden: isEditingMeasure === m }"
+                  @focus="handleEditMeasureRhythm(idxP, idxMc, m)"
+                >
+                  <div
+                    v-for="(c, idxC) in m.rNotes"
+                    class="text-center w-[1em]"
+                  >
+                    {{ c }}
+                  </div>
+                </div>
+                <textarea
+                  :id="`pattern-${idxP}-measure-${idxMc}-rhythm-textarea`"
+                  type="text"
+                  class="w-full field-sizing-content text-center content-center"
+                  rows="1"
+                  :class="{ hidden: isEditingMeasure !== m }"
+                  :value="m.rNotes"
+                  @change="(e) => inputMeasureNotation(e, m)"
+                  @focus="(e) => selectAllText(e)"
+                  @focusout="isEditingMeasure = undefined"
+                  wrap="soft"
+                ></textarea>
+              </div>
+              <div class="flex w-full h-[50%]">
+                <div class="w-full h-full flex justify-evenly">
+                  <div v-for="(c, idxC) in m.rNotes" class="w-[1em]">
+                    <div
+                      v-if="Number(c)"
+                      class="relative w-full h-full flex justify-center"
+                    >
+                      <input
+                        tabindex="0"
+                        type="number"
+                        class="opacity-0 absolute inset-0 peer"
+                        v-model="m.mNotes[getMelodyIndex(idxC, m.rNotes)]"
+                      />
+                      <div
+                        class="flex font-thin text-xs text-center justify-center items-center select-none peer-focus:ring-2 peer-focus:ring-blue-600"
+                      >
+                        <div>
+                          {{ m.mNotes[getMelodyIndex(idxC, m.rNotes)] }}
+                        </div>
+                      </div>
+                    </div>
+                    <div v-else-if="c === ':'" class="text-center">{{ c }}</div>
+                    <div v-else></div>
+                  </div>
+                </div>
+              </div>
             </div>
           </template>
         </div>

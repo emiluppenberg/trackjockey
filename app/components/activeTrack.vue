@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { Measure, Track, Tracker } from "~/types2";
+import type { Measure, Track } from "~/types2";
+import { selectAllText } from "~/types2";
 import ActiveTrackMixer from "./activeTrackMixer.vue";
 const audioStore = useAudioStore();
 const tracks = audioStore.tracker.tracks;
@@ -77,15 +78,11 @@ function changeActiveTrackFigure(e: KeyboardEvent) {
     }
   }
 }
-function selectAllText(e: Event) {
-  const target = e.target as HTMLInputElement;
-  target.select();
-}
 function getCursorForDNotes(m: Measure, idxC: number): boolean {
   let colonIndices: number[] = [];
   let currentNoteIdx: number = idxC;
-  for (let i = 0; i < m.dNotes.length; i++) {
-    if (m.dNotes[i] === ":") {
+  for (let i = 0; i < m.rNotes.length; i++) {
+    if (m.rNotes[i] === ":") {
       colonIndices.push(i);
     }
   }
@@ -98,7 +95,7 @@ function getCursorForDNotes(m: Measure, idxC: number): boolean {
     }
   }
 
-  const dNotesClean = m.dNotes.replaceAll(":", "");
+  const dNotesClean = m.rNotes.replaceAll(":", "");
   const fLen = 64 / dNotesClean.length;
   const nextNoteIdx = currentNoteIdx + 1;
 
@@ -193,7 +190,7 @@ onMounted(() => {
           >
             <p
               v-for="(c, idxC) in p.measures.find((m) => m.index === idxMc)
-                ?.dNotes"
+                ?.rNotes"
               class="text-center font-semibold"
               :class="{
                 'text-emerald-600': getCursorForDNotes(
