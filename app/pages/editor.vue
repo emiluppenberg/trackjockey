@@ -4,7 +4,7 @@ const audioStore = useAudioStore();
 
 <template>
   <div class="flex">
-    <Figures v-if="audioStore.audioContext"
+    <Figures v-if="audioStore.audioContext && audioStore.figures.length > 0"
     ></Figures>
     <Sampler v-if="audioStore.audioContext"
     ></Sampler>

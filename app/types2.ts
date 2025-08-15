@@ -1,69 +1,146 @@
+export type Measure = {
+  index: number;
+  rNotes: string;
+  mNotes: string[];
+  fNotes: string;
+};
+
 export type Sample = {
-    audioBuffer: AudioBuffer,
-    source?: AudioBufferSourceNode,
-    name: string,
-    keyBind?: string
-}
+  audioBuffer: AudioBuffer;
+  source?: AudioBufferSourceNode;
+  name: string;
+  keyBind?: string;
+  channelNode: ChannelMergerNode;
+  mixer: Mixer;
+};
 
 export type Figure = {
-    name: string,
-    color: string,
-    keyBind?: string,
-    measureCount: number,
-    tempo: number,
-    patterns: Pattern[]
-}
+  name: string;
+  color: string;
+  keyBind?: string;
+  measureCount: number;
+  tempo: number;
+  patterns: Pattern[];
+  channelNode: ChannelMergerNode;
+  mixer: Mixer;
+};
 
 export type Pattern = {
-    mute: boolean,
-    sample: Sample,
-    measures: Measure[]
-}
-
-export type Measure = {
-    index: number,
-    rNotes: string,
-    mNotes: string[],
-    fNotes: string
-}
+  mute: boolean;
+  sample: Sample;
+  measures: Measure[];
+  channelNode: ChannelMergerNode;
+  mixer: Mixer;
+};
 
 export type Tracker = {
-    bpm: number,
-    tracks: Track[]
-}
+  bpm: number;
+  tracks: Track[];
+  channelNode: ChannelMergerNode;
+  mixer: Mixer;
+};
 
 export type Track = {
-    figure?: Figure,
-    channel: ChannelMergerNode,
-    pitchProcessor: AudioWorkletNode,
-    pitch: number
-}
+  figure?: Figure;
+  channelNode: ChannelMergerNode;
+  mixer: Mixer;
+};
 
-export type DragHandler = {
-    moveHandler: (e: MouseEvent) => void;
-    upHandler: (e: MouseEvent) => void;
-}
+export type Mixer = {
+  pitcherNode: AudioWorkletNode;
+  pitchValue: number;
+  pannerNode: StereoPannerNode;
+  panValue: number;
+  channelNode: ChannelMergerNode;
+};
 
+export function isFigure(sound: Figure | Sample): sound is Figure {
+  return (sound as Figure).measureCount !== undefined;
+}
+export function isSample(sound: Sample | Figure): sound is Sample {
+  return (sound as Sample).audioBuffer !== undefined;
+}
 export async function sleep(ms: number) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-}
-export function isFigure(sound: Figure | Sample): sound is Figure{
-    return (sound as Figure).measureCount !== undefined;
-}
-export function isSample(sound: Sample | Figure): sound is Sample{
-    return (sound as Sample).audioBuffer !== undefined;
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 export function selectAllText(e: Event) {
   const target = e.target as HTMLInputElement;
   target.select();
 }
+
+export function createMixer(audioContext: AudioContext): Mixer {
+  const mixer = {
+    channelNode: audioContext.createChannelMerger(),
+    panValue: 0.5,
+    pannerNode: audioContext.createStereoPanner(),
+    pitchValue: 0,
+    pitcherNode: new AudioWorkletNode(audioContext, "pitch-processor"),
+  };
+
+  mixer.pannerNode.pan.value = mixer.panValue;
+  mixer.pitcherNode.parameters.get("pitch")!.value = mixer.pitchValue;
+
+  return mixer;
+}
+
+export function createSample(
+  audioBuffer: AudioBuffer,
+  name: string,
+  audioContext: AudioContext
+): Sample {
+  return {
+    audioBuffer: audioBuffer,
+    name: name,
+    channelNode: audioContext.createChannelMerger(),
+    mixer: createMixer(audioContext),
+  };
+}
+
+export function createPattern(
+  sample: Sample,
+  measures: Measure[],
+  audioContext: AudioContext
+): Pattern {
+  return {
+    mute: false,
+    sample: sample,
+    measures: measures,
+    channelNode: audioContext.createChannelMerger(),
+    mixer: createMixer(audioContext),
+  };
+}
+
+export function createFigure(
+  name: string,
+  color: string,
+  keyBind: string,
+  measureCount: number,
+  tempo: number,
+  patterns: Pattern[],
+  audioContext: AudioContext
+): Figure {
+  return {
+    name: name,
+    color: color,
+    keyBind: keyBind,
+    measureCount: measureCount,
+    tempo: tempo,
+    patterns: patterns,
+    channelNode: audioContext.createChannelMerger(),
+    mixer: createMixer(audioContext),
+  };
+}
 // Ignore below
 
+// export type DragHandler = {
+//     moveHandler: (e: MouseEvent) => void;
+//     upHandler: (e: MouseEvent) => void;
+// }
 // export type Sample = {
 //     fileName: string,
 //     audioBuffer: AudioBuffer,
 //     sampleSource: AudioBufferSourceNode,
-//     analyser: AnalyserNode, 
+//     analyser: AnalyserNode,
 //     button: string,
 //     isPlaying: boolean
 // }
@@ -106,7 +183,7 @@ export function selectAllText(e: Event) {
 //               : '',
 //             width: beatNoteDivSize! < 120 ? beatNoteDivSize + 'px' : '20%',
 //             height: beatNoteDivSize! < 120 ? beatNoteDivSize + 'px' : '20%',
-//             transform: `translate(-50%, -50%) 
+//             transform: `translate(-50%, -50%)
 //              rotate(${(360 / beatNotes.length) * idxB}deg)`,
 //           }"
 //           :id="`beatnote-${idxB}`"

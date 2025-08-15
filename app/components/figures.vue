@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { flatMap } from "lodash-es";
-import { renderToSimpleStream } from "vue/server-renderer";
 import {
   selectAllText,
   sleep,
+  createSample,
+  createPattern,
+  createFigure,
   type Figure,
   type Measure,
   type Pattern,
@@ -22,22 +23,14 @@ const sFigure = ref<Figure>();
 function addPattern() {
   if (sFigure.value) {
     if (samples[0]) {
-      sFigure.value.patterns.push({
-        mute: false,
-        sample: samples[0],
-        measures: [],
-      });
+      sFigure.value.patterns.push(createPattern(samples[0], [], audioContext));
     }
   }
 }
 function addFigure() {
-  const fLen = figures.push({
-    name: "",
-    color: "#D6B300",
-    measureCount: 1,
-    tempo: 120,
-    patterns: [],
-  });
+  const fLen = figures.push(
+    createFigure("", "#D6B300", "", 1, 120, [], audioContext)
+  );
   sFigure.value = figures[fLen - 1];
 }
 
@@ -232,56 +225,56 @@ function getMelodyIndex(idxC: number, rNotes: string): number {
 }
 
 function changeFigureTempo(e: Event) {
-  if (sFigure.value) {
-    const value = (e.target as HTMLInputElement).value;
-    if (Number(value)) {
-      sFigure.value.tempo = Number(value);
-    } else if (value === "") {
-      return;
-    } else if (!Number(value)) {
-      alert("Tempo must be a number");
-    }
+  // TODO Change input to number
+  if (!sFigure.value) return;
+
+  const value = (e.target as HTMLInputElement).value;
+  if (Number(value)) {
+    sFigure.value.tempo = Number(value);
+  } else if (value === "") {
+    return;
+  } else if (!Number(value)) {
+    alert("Tempo must be a number");
   }
 }
-function changeFigureMeasures(e: Event) {
-  if (sFigure.value) {
-    const value = (e.target as HTMLInputElement).value;
-    if (Number(value)) {
-      if (sFigure.value.patterns[0]) {
-        const mPop = sFigure.value.patterns.flatMap((p) =>
-          p.measures.filter((m) => m.index > Number(value))
-        );
-        if (mPop.length > 0) {
-          const ok = confirm(`Continuing will remove ${mPop.length} measures`);
-          if (ok) {
-            for (const mp of mPop) {
-              sFigure.value.patterns.flatMap((p) => {
-                const idx = p.measures.findIndex((_mp) => _mp === mp);
-                idx >= 0 && p.measures.splice(idx, 1);
-              });
-            }
+function changeFigureMeasures(e: Event) { // TODO Change input to number
+  if (!sFigure.value) return;
+  const value = (e.target as HTMLInputElement).value;
+  if (Number(value)) {
+    if (sFigure.value.patterns[0]) {
+      const mPop = sFigure.value.patterns.flatMap((p) =>
+        p.measures.filter((m) => m.index > Number(value))
+      );
+      if (mPop.length > 0) {
+        const ok = confirm(`Continuing will remove ${mPop.length} measures`);
+        if (ok) {
+          for (const mp of mPop) {
+            sFigure.value.patterns.flatMap((p) => {
+              const idx = p.measures.findIndex((_mp) => _mp === mp);
+              idx >= 0 && p.measures.splice(idx, 1);
+            });
           }
         }
       }
-      sFigure.value.measureCount = Number(value);
-    } else if (value === "") {
-      return;
-    } else if (!Number(value)) {
-      alert("Measures must be a number");
     }
+    sFigure.value.measureCount = Number(value);
+  } else if (value === "") {
+    return;
+  } else if (!Number(value)) {
+    alert("Measures must be a number");
   }
 }
 
 async function playSelectedFigure() {
   if (sFigure.value && sFigure.value.measureCount > 0) {
     isPlaying.value = true;
-    const channel = audioContext.createChannelMerger(sFigure.value.patterns.length);
+    const channel = audioContext.createChannelMerger(
+      sFigure.value.patterns.length
+    );
     const panner = audioContext.createStereoPanner();
     panner.pan.value = 0.5;
 
-    channel
-      .connect(panner)
-      .connect(audioContext.destination);
+    channel.connect(panner).connect(audioContext.destination);
 
     while (true) {
       const noteLength = // Note length in milliseconds
@@ -299,7 +292,7 @@ async function playSelectedFigure() {
               const melody = Number(m.mNotes[j]) || 0;
 
               if (velocity) {
-                audioStore.playSample(p.sample, velocity, melody, channel);
+                audioStore.playSample(p.sample, velocity, melody);
               }
               if (m.fNotes[j] === "X") {
                 audioStore.stopSample(p.sample);
@@ -362,29 +355,17 @@ async function loadFigures() {
     samples.pop();
   }
 
-  samples.push({ audioBuffer: kick1, name: "kick1" });
-  samples.push({
-    audioBuffer: hihat1,
-    name: "hihat1",
-  });
-  samples.push({
-    audioBuffer: snare1,
-    name: "snare1",
-  });
-  samples.push({ audioBuffer: kick2, name: "kick2" });
-  samples.push({
-    audioBuffer: hihat2,
-    name: "hihat2",
-  });
-  samples.push({
-    audioBuffer: snare2,
-    name: "snare2",
-  });
-  samples.push({ audioBuffer: arp1, name: "arp1" });
-
   for (const f of figures) {
     figures.pop();
   }
+
+  samples.push(createSample(kick1, "kick1", audioContext));
+  samples.push(createSample(hihat1, "hihat1", audioContext));
+  samples.push(createSample(snare1, "snare1", audioContext));
+  samples.push(createSample(kick2, "kick2", audioContext));
+  samples.push(createSample(hihat2, "hihat2", audioContext));
+  samples.push(createSample(snare2, "kick2", audioContext));
+  samples.push(createSample(arp1, "arp1", audioContext));
 
   for (let i = 0; i < 3; i++) {
     let kickNotes = "";
@@ -439,30 +420,21 @@ async function loadFigures() {
         j = 3;
       }
 
-      const kickP: Pattern = {
-        mute: false,
-        sample: samples[0 + j]!,
-        measures: [kickM],
-      };
-      const hihatP: Pattern = {
-        mute: false,
-        sample: samples[1 + j]!,
-        measures: [hihatM],
-      };
-      const snareP: Pattern = {
-        mute: false,
-        sample: samples[2 + j]!,
-        measures: [snareM],
-      };
+      const kickP = createPattern(samples[0 + j]!, [kickM], audioContext);
+      const hihatP = createPattern(samples[1 + j]!, [hihatM], audioContext);
+      const snareP = createPattern(samples[2 + j]!, [snareM], audioContext);
 
-      figures.push({
-        name: phraseName,
-        color: "#D6B300",
-        keyBind: keyBind,
-        measureCount: 1,
-        tempo: 120,
-        patterns: [kickP, hihatP, snareP],
-      });
+      figures.push(
+        createFigure(
+          phraseName,
+          "#D6B300",
+          keyBind,
+          1,
+          120,
+          [kickP, hihatP, snareP],
+          audioContext
+        )
+      );
     } else {
       const arpM: Measure = {
         index: 1,
@@ -471,20 +443,19 @@ async function loadFigures() {
         fNotes: convertTo64Rhythm(arpNotes),
       };
 
-      const arpP: Pattern = {
-        mute: false,
-        sample: samples[6]!,
-        measures: [arpM],
-      };
+      const arpP = createPattern(samples[6]!, [arpM], audioContext);
 
-      figures.push({
-        name: phraseName,
-        color: "#D6B300",
-        keyBind: keyBind,
-        measureCount: 1,
-        tempo: 120,
-        patterns: [arpP],
-      });
+      figures.push(
+        createFigure(
+          phraseName,
+          "#D6B300",
+          keyBind,
+          1,
+          120,
+          [arpP],
+          audioContext
+        )
+      );
     }
   }
   sFigure.value = figures[0];

@@ -4,7 +4,7 @@ const audioStore = useAudioStore();
 
 <template>
   <div class="flex">
-    <TrackerMain v-if="audioStore.audioContext"></TrackerMain>
-    <ActiveTrack v-if="audioStore.audioContext"></ActiveTrack>
+    <TrackerMain v-if="audioStore.audioContext && audioStore.tracker"></TrackerMain>
+    <ActiveTrack v-if="audioStore.audioContext && audioStore.tracker"></ActiveTrack>
   </div>
 </template>

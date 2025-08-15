@@ -30,12 +30,9 @@ watch(
     <input
       id="active-track-pitch"
       type="number"
-      :value="activeTrack.pitch"
+      :value="activeTrack.mixer.pitchValue"
       class="w-[20%] h-[25%] border-b border-r border-white"
       @change="(e) => onChangePitch(e)"
     />
-    <button class="bg-white" @click="console.log(activeTrack.pitch)">
-      Pitch
-    </button>
   </div>
 </template>

@@ -1,19 +1,21 @@
 <script setup lang="ts">
-import { isFigure, isSample, sleep, type Figure, type Sample } from "~/types2";
+import { createMixer, isFigure, isSample, type Figure, type Sample } from "~/types2";
 const audioStore = useAudioStore();
-const tracker = audioStore.tracker;
-const figures = audioStore.figures;
+const tracker = audioStore.tracker!;
 const audioContext = audioStore.audioContext!;
+const figures = audioStore.figures;
 const isKeyDown = ref<boolean>(false);
 
 function changeTrackerBpm(e: Event) {
+  // TODO Change input to number
   const element = e.target as HTMLInputElement;
   const value = element.value;
-  if (Number(value)) {
-    tracker.bpm = Number(value);
-  }
+
+  if (Number(value)) tracker.bpm = Number(value);
 }
+
 function changeTracksLength(e: Event) {
+  // TODO Change input to number
   const value = (e.target as HTMLInputElement).value;
 
   if (Number(value)) {
@@ -27,19 +29,11 @@ function changeTracksLength(e: Event) {
 
     if (tracker.tracks.length < len) {
       for (let i = tracker.tracks.length; i < len; i++) {
-        const pitchProcessor = new AudioWorkletNode(
-          audioContext,
-          "pitch-processor"
-        );
-        pitchProcessor.connect(audioContext.destination);
-
-        const channel = new ChannelMergerNode(audioContext);
-        channel.connect(pitchProcessor);
-
+        // Make nicer
         tracker.tracks.push({
-          channel: channel,
-          pitchProcessor: pitchProcessor,
-          pitch: 0,
+          figure: figures[0]!,
+          channelNode: audioContext.createChannelMerger(),
+          mixer: createMixer(audioContext)
         });
       }
     }
@@ -78,18 +72,18 @@ onMounted(() => {
       isKeyDown.value = true;
       handlePlayOrStop(e);
     }
-  }
+  };
   const spaceKeyUpListener = (e: KeyboardEvent) => {
     isKeyDown.value = false;
-  }
+  };
 
   window.addEventListener("keydown", spaceKeyDownListener);
-  window.addEventListener('keyup', spaceKeyUpListener);
+  window.addEventListener("keyup", spaceKeyUpListener);
 
   onBeforeUnmount(() => {
-    window.removeEventListener('keydown', spaceKeyDownListener);
-    window.removeEventListener('keyup', spaceKeyUpListener);
-  })
+    window.removeEventListener("keydown", spaceKeyDownListener);
+    window.removeEventListener("keyup", spaceKeyUpListener);
+  });
 });
 </script>
 
@@ -132,14 +126,10 @@ onMounted(() => {
             v-for="(t, idxT) in tracker.tracks"
             :key="idxT"
             class="flex flex-col border-b border-black items-start"
-            :style="{ backgroundColor: t.figure?.color }"
+            :style="{ backgroundColor: t.figure ? t.figure.color : '#000000' }"
           >
             <label class="block truncate overflow-hidden">
-              {{
-                (tracker.tracks.indexOf(t) + 1).toString() +
-                ": " +
-                t.figure?.name
-              }}
+              {{ (tracker.tracks.indexOf(t) + 1).toString() + ": " + t.figure?.name }}
             </label>
           </div>
         </div>
