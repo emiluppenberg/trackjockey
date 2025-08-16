@@ -10,7 +10,7 @@ export type Sample = {
   source?: AudioBufferSourceNode;
   name: string;
   keyBind?: string;
-  channelNode: ChannelMergerNode;
+  velocityNode: GainNode;
   mixer: Mixer;
 };
 
@@ -21,7 +21,6 @@ export type Figure = {
   measureCount: number;
   tempo: number;
   patterns: Pattern[];
-  channelNode: ChannelMergerNode;
   mixer: Mixer;
 };
 
@@ -29,29 +28,26 @@ export type Pattern = {
   mute: boolean;
   sample: Sample;
   measures: Measure[];
-  channelNode: ChannelMergerNode;
   mixer: Mixer;
 };
 
 export type Tracker = {
   bpm: number;
   tracks: Track[];
-  channelNode: ChannelMergerNode;
   mixer: Mixer;
 };
 
 export type Track = {
   figure?: Figure;
-  channelNode: ChannelMergerNode;
   mixer: Mixer;
 };
 
 export type Mixer = {
-  pitcherNode: AudioWorkletNode;
+  pitcherNode?: AudioWorkletNode;
   pitchValue: number;
   pannerNode: StereoPannerNode;
   panValue: number;
-  channelNode: ChannelMergerNode;
+  gainNode: GainNode;
 };
 
 export function isFigure(sound: Figure | Sample): sound is Figure {
@@ -69,18 +65,13 @@ export function selectAllText(e: Event) {
 }
 
 export function createMixer(audioContext: AudioContext): Mixer {
-  const mixer = {
-    channelNode: audioContext.createChannelMerger(),
-    panValue: 0.5,
+  return  {
+    gainNode: audioContext.createGain(),
+    panValue: 0,
     pannerNode: audioContext.createStereoPanner(),
     pitchValue: 0,
-    pitcherNode: new AudioWorkletNode(audioContext, "pitch-processor"),
+    pitcherNode: undefined,
   };
-
-  mixer.pannerNode.pan.value = mixer.panValue;
-  mixer.pitcherNode.parameters.get("pitch")!.value = mixer.pitchValue;
-
-  return mixer;
 }
 
 export function createSample(
@@ -88,12 +79,16 @@ export function createSample(
   name: string,
   audioContext: AudioContext
 ): Sample {
-  return {
+  const sample = {
     audioBuffer: audioBuffer,
     name: name,
-    channelNode: audioContext.createChannelMerger(),
+    velocityNode: audioContext.createGain(),
     mixer: createMixer(audioContext),
   };
+
+  sample.velocityNode.connect(sample.mixer.pannerNode);
+  
+  return sample;
 }
 
 export function createPattern(
@@ -105,7 +100,6 @@ export function createPattern(
     mute: false,
     sample: sample,
     measures: measures,
-    channelNode: audioContext.createChannelMerger(),
     mixer: createMixer(audioContext),
   };
 }
@@ -126,7 +120,6 @@ export function createFigure(
     measureCount: measureCount,
     tempo: tempo,
     patterns: patterns,
-    channelNode: audioContext.createChannelMerger(),
     mixer: createMixer(audioContext),
   };
 }

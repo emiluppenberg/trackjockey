@@ -13,8 +13,10 @@ export const useAudioStore = defineStore("audioStore", () => {
   const figures = ref<Figure[]>([]);
   const samples = ref<Sample[]>([]);
   const tracker = ref<Tracker>();
+
   const isPlaying = ref<boolean>(false);
   const cursor = ref<number>(0);
+  const currentMeasure = ref<number>(0);
 
   onMounted(async () => {
     audioContext.value = new AudioContext();
@@ -29,11 +31,9 @@ export const useAudioStore = defineStore("audioStore", () => {
       tracks: [
         {
           figure: undefined,
-          channelNode: audioContext.value.createChannelMerger(),
           mixer: createMixer(audioContext.value),
         },
       ],
-      channelNode: audioContext.value.createChannelMerger(),
       mixer: createMixer(audioContext.value),
     };
   });
@@ -41,9 +41,8 @@ export const useAudioStore = defineStore("audioStore", () => {
   async function playSample(s: Sample, velocity: number, melody: number) {
     if (!audioContext.value) return;
 
-    const gain = (velocity * 2) / 10;
-    const gainNode = audioContext.value.createGain();
-    gainNode.gain.value = gain;
+    const vGain = (velocity * 2) / 10;
+    s.velocityNode.gain.value = vGain;
 
     s.source = audioContext.value.createBufferSource();
     s.source.buffer = s.audioBuffer;
@@ -51,7 +50,7 @@ export const useAudioStore = defineStore("audioStore", () => {
     const detune = melody * 100;
     s.source.detune.value = detune;
 
-    s.source.connect(s.channelNode);
+    s.source.connect(s.velocityNode);
     s.source.start();
   }
 
@@ -62,84 +61,77 @@ export const useAudioStore = defineStore("audioStore", () => {
     s.source = undefined;
   }
 
-  async function connectTracker() {
+  async function mixerConnectChildToParent(cMixer: Mixer, pMixer: Mixer) {
+    let lastNode: AudioNode = cMixer.pannerNode; // Default audio flow : pannerNode -> pitcherNode? -> ... -> gainNode -> parent
+    lastNode.disconnect(0);
+    if (cMixer.pitcherNode) lastNode = lastNode.connect(cMixer.pitcherNode);
+    lastNode.connect(cMixer.gainNode).connect(pMixer.pannerNode);
+  }
+
+  async function mixerConnectTracker() {
     if (!audioContext.value) return;
     if (!tracker.value) return;
-    console.log(tracker.value);
-    tracker.value.mixer.channelNode
-      .connect(tracker.value.mixer.pannerNode)
+
+    tracker.value.mixer.pannerNode
+      .connect(tracker.value.mixer.gainNode)
       // .connect(tracker.value.mixer.pitcherNode)
       .connect(audioContext.value.destination);
 
     for (const t of tracker.value.tracks) {
-      t.mixer.channelNode
-        .connect(t.mixer.pannerNode)
-        .connect(t.mixer.pitcherNode)
-        .connect(tracker.value.mixer.channelNode);
+      mixerConnectChildToParent(t.mixer, tracker.value.mixer);
 
       if (t.figure) {
-        t.figure.mixer.channelNode
-          .connect(t.figure.mixer.pannerNode)
-          // .connect(t.figure.mixer.pitcherNode)
-          .connect(t.mixer.channelNode);
+        mixerConnectChildToParent(t.figure.mixer, t.mixer);
 
         for (const p of t.figure.patterns) {
-          p.mixer.channelNode
-            .connect(p.mixer.pannerNode)
-            // .connect(p.mixer.pitcherNode)
-            .connect(t.figure.mixer.channelNode);
-
-          p.sample.channelNode // Sample has extra channelNode to connect in playSample
-            .connect(p.sample.mixer.pannerNode)
-            // .connect(p.sample.mixer.pitcherNode)
-            .connect(p.sample.mixer.channelNode)
-            .connect(p.mixer.channelNode);
+          mixerConnectChildToParent(p.mixer, t.figure.mixer);
+          mixerConnectChildToParent(p.sample.mixer, p.mixer);
         }
       }
     }
   }
 
+  async function advanceCursor() {}
+
   async function playTracker() {
     if (isPlaying.value) return;
-    if (!tracker.value) return;
 
+    cursor.value = -1;
+    currentMeasure.value = 0;
     isPlaying.value = true;
-    let noteLength;
-    let j = -1;
-    let i = 0;
 
-    await connectTracker();
+    await mixerConnectTracker();
 
-    while (isPlaying.value) {
-      const maxMeasures = tracker.value.tracks.map((t) => {
-        if (t.figure) return t.figure.measureCount;
-        return 0;
-      });
+    const advanceCursor = async () => {
+      if (!tracker.value) return;
 
-      const m = Math.max(...maxMeasures);
+      const maxMeasures = Math.max(
+        ...tracker.value.tracks.map((t) => {
+          if (t.figure) return t.figure.measureCount;
+          return 0;
+        })
+      );
 
-      j++;
-      if (j === 64) j = 0;
-      cursor.value = j;
+      cursor.value++;
+      if (cursor.value === 64) cursor.value = 0;
+      if (cursor.value === 0) currentMeasure.value++;
+      if (currentMeasure.value > maxMeasures) currentMeasure.value = 1;
 
-      if (j === 0) i++;
-      if (i > m) i = 1;
+      let noteLength = (1 / (64 / 4)) * (60 / tracker.value.bpm) * 1000; // milliseconds
 
-      for (let k = 0; k < tracker.value.tracks.length; k++) {
-        const t = tracker.value.tracks[k];
-
-        if (t && t.figure) {
-          noteLength = (1 / (64 / 4)) * (60 / tracker.value.bpm) * 1000; // milliseconds
-
+      for (const t of tracker.value.tracks) {
+        if (t.figure) {
           for (const p of t.figure.patterns) {
             if (p.mute) {
               stopSample(p.sample);
             } else {
-              const m = p.measures.find((_m) => _m.index === i);
+              const m = p.measures.find(
+                (_m) => _m.index === currentMeasure.value
+              );
 
-              if (m && m.fNotes[j] !== "-") {
-                const velocity = Number(m.fNotes[j]);
-                const melody = Number(m.mNotes[j]) || 0;
+              if (m && m.fNotes[cursor.value] !== "-") {
+                const velocity = Number(m.fNotes[cursor.value]);
+                const melody = Number(m.mNotes[cursor.value]) || 0;
 
                 if (velocity) {
                   playSample(p.sample, velocity, melody);
@@ -155,6 +147,9 @@ export const useAudioStore = defineStore("audioStore", () => {
       if (!noteLength) await sleep(30);
       if (noteLength) await sleep(noteLength);
       if (!isPlaying.value) return;
+    };
+    while (isPlaying.value) {
+      await advanceCursor();
     }
   }
   async function stopTracker() {
@@ -173,5 +168,6 @@ export const useAudioStore = defineStore("audioStore", () => {
     stopSample,
     playTracker,
     stopTracker,
+    mixerConnectChildToParent,
   };
 });

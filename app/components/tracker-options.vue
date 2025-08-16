@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import { createMixer, isFigure, isSample, type Figure, type Sample } from "~/types2";
+import {
+  createMixer,
+  isFigure,
+  isSample,
+  type Figure,
+  type Sample,
+} from "~/types2";
 const audioStore = useAudioStore();
 const tracker = audioStore.tracker!;
 const audioContext = audioStore.audioContext!;
@@ -31,9 +37,8 @@ function changeTracksLength(e: Event) {
       for (let i = tracker.tracks.length; i < len; i++) {
         // Make nicer
         tracker.tracks.push({
-          figure: figures[0]!,
-          channelNode: audioContext.createChannelMerger(),
-          mixer: createMixer(audioContext)
+          figure: undefined,
+          mixer: createMixer(audioContext),
         });
       }
     }
@@ -126,10 +131,14 @@ onMounted(() => {
             v-for="(t, idxT) in tracker.tracks"
             :key="idxT"
             class="flex flex-col border-b border-black items-start"
-            :style="{ backgroundColor: t.figure ? t.figure.color : '#000000' }"
+            :style="{ backgroundColor: t.figure ? t.figure.color : '#999999' }"
           >
             <label class="block truncate overflow-hidden">
-              {{ (tracker.tracks.indexOf(t) + 1).toString() + ": " + t.figure?.name }}
+              {{
+                (tracker.tracks.indexOf(t) + 1).toString() +
+                ": " +
+                t.figure?.name
+              }}
             </label>
           </div>
         </div>

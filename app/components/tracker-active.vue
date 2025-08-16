@@ -1,23 +1,24 @@
 <script setup lang="ts">
 import { selectAllText, type Measure, type Track } from "~/types2";
-import ActiveTrackMixer from "./activeTrackMixer.vue";
 const audioStore = useAudioStore();
+const audioContext = audioStore.audioContext!;
+const tracker = audioStore.tracker!;
 const tracks = audioStore.tracker!.tracks;
 const figures = audioStore.figures;
 const activeTrack = ref<Track>(tracks[0]!);
-
 const isChangingActiveTrack = ref<boolean>(false);
+
+const emit = defineEmits(["changeActiveTrack"]);
 
 function inputActiveTrack(e: Event) {
   const element = e.target as HTMLInputElement;
-  const idxT = Number(element.value) - 1;
   element.style.color = "black";
+
+  const idxT = Number(element.value) - 1;
   const t = tracks[idxT];
-  if (t) {
-    activeTrack.value = t;
-  } else {
-    element.style.color = "red";
-  }
+
+  if (t) activeTrack.value = t;
+  else element.style.color = "red";
 }
 function changeActiveTrack(e: Event) {
   const element = e.target as HTMLInputElement;
@@ -26,6 +27,7 @@ function changeActiveTrack(e: Event) {
 
   if (t) {
     activeTrack.value = t;
+    emit("changeActiveTrack", idxT);
     return;
   } else {
     element.value = (tracks.indexOf(activeTrack.value!) + 1).toString();
@@ -39,44 +41,36 @@ function activeTrackFocus(e: KeyboardEvent) {
   switch (isChangingActiveTrack.value) {
     case true:
       const activeTrackElement = document.getElementById("active-track-input");
-      if (activeTrackElement) {
-        activeTrackElement.focus();
-      }
+      if (activeTrackElement) activeTrackElement.focus();
       break;
     case false:
       enableKeysFocus(e);
+      break;
   }
 }
 function enableKeysFocus(e: KeyboardEvent) {
   e.preventDefault();
 
-  if (isChangingActiveTrack.value) {
+  if (isChangingActiveTrack.value)
     isChangingActiveTrack.value = !isChangingActiveTrack.value;
-  }
 
   const enableKeysElement = document.getElementById("active-track-enable-keys");
 
-  if (enableKeysElement) {
-    enableKeysElement.focus();
-  }
+  if (enableKeysElement) enableKeysElement.focus();
 }
 function changeActiveTrackFigure(e: KeyboardEvent) {
-  if (e.code === "Tab") {
-    return;
-  }
+  if (e.code === "Tab") return;
 
   e.preventDefault();
 
   if (e.code === "KeyQ") {
-    activeTrack.value.figure = figures[0]!;
+    activeTrack.value.figure = undefined;
     return;
   }
 
   const f = figures.find((_f) => _f.keyBind === e.code);
 
-  if (f) {
-    activeTrack.value.figure = f;
-  }
+  if (f) activeTrack.value.figure = f;
 }
 function getCursorForDNotes(m: Measure, idxC: number): boolean {
   let colonIndices: number[] = [];
@@ -98,15 +92,15 @@ function getCursorForDNotes(m: Measure, idxC: number): boolean {
 
   if (audioStore.cursor === currentNoteIdx * fLen) return true;
 
-  if (audioStore.cursor < nextNoteIdx * fLen && audioStore.cursor > currentNoteIdx * fLen) return true;
+  if (
+    audioStore.cursor < nextNoteIdx * fLen &&
+    audioStore.cursor > currentNoteIdx * fLen
+  )
+    return true;
 
   return false;
 }
 
-function handleChangeActiveTrackPitch(pitch: number) {
-    activeTrack.value.mixer.pitchValue = pitch;
-    activeTrack.value.mixer.pitcherNode.parameters.get("pitch")!.value = pitch;
-}
 onMounted(() => {
   window.addEventListener("keydown", (e) => {
     if (e.code === "BracketLeft") {
@@ -123,7 +117,11 @@ onMounted(() => {
   <div
     id="active-track"
     class="w-full h-full flex flex-col overflow-hidden border border-black"
-    :style="{ backgroundColor: activeTrack?.figure?.color }"
+    :style="{
+      backgroundColor: activeTrack.figure
+        ? activeTrack.figure.color
+        : '#999999',
+    }"
   >
     <div
       id="active-track-options"
@@ -139,11 +137,16 @@ onMounted(() => {
         id="active-track-input"
         type="number"
         class="w-1/3 border-r border-black text-center text-4xl"
+        :value="tracks.indexOf(activeTrack) + 1"
         @input="(e) => inputActiveTrack(e)"
         @change="(e) => changeActiveTrack(e)"
         @focus="(e) => selectAllText(e)"
         @keydown.enter="(e) => activeTrackFocus(e)"
-        :style="{ backgroundColor: activeTrack?.figure?.color }"
+        :style="{
+          backgroundColor: activeTrack.figure
+            ? activeTrack.figure.color
+            : '#999999',
+        }"
       />
       <button
         id="active-track-enable-keys"
@@ -196,15 +199,6 @@ onMounted(() => {
           </div>
         </div>
       </template>
-    </div>
-    <div id="active-track-mixer" class="w-full h-full">
-      <ActiveTrackMixer
-        v-if="activeTrack"
-        :active-track="activeTrack"
-        @change-active-track-pitch="
-          (pitch: number) => handleChangeActiveTrackPitch(pitch)
-        "
-      ></ActiveTrackMixer>
     </div>
   </div>
 </template>

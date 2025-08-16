@@ -13,7 +13,7 @@ class PitchProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
 
-    this.bufferSize = 4096;
+    this.bufferSize = 1024;
 
     this.buffers = []; // buffers[ch] will store recent input samples for ch so we can read across blocks
     this.writePos = []; // writePos[ch] is where the next incoming sample for ch will be written

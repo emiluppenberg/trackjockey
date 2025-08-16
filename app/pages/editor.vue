@@ -4,9 +4,9 @@ const audioStore = useAudioStore();
 
 <template>
   <div class="flex">
-    <Figures v-if="audioStore.audioContext && audioStore.figures.length > 0"
-    ></Figures>
-    <Sampler v-if="audioStore.audioContext"
-    ></Sampler>
+    <EditorFigures v-if="audioStore.audioContext && audioStore.figures.length > 0"
+    ></EditorFigures>
+    <EditorSampler v-if="audioStore.audioContext"
+    ></EditorSampler>
   </div>
 </template>
