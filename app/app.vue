@@ -1,4 +1,9 @@
 <script setup lang="ts">
+useHead({
+  bodyAttrs: {
+    class: "bg-emerald-300",
+  },
+});
 </script>
 
 <template>
@@ -16,7 +21,15 @@ input::-webkit-inner-spin-button {
 }
 
 /* Firefox */
-input[type=number] {
+input[type="number"] {
   -moz-appearance: textfield;
+}
+
+.bg-color1 {
+  background-color: #B0C6CE;
+}
+
+.input-color1 {
+  background-color: #b0c6ce1e;
 }
 </style>

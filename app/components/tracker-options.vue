@@ -93,86 +93,81 @@ onMounted(() => {
 </script>
 
 <template>
-  <!-- Left -->
-  <div class="flex flex-col w-[50%] h-full border-r border-black items-center">
-    <!-- Tracker -->
-    <div
-      id="tracker-ui"
-      v-if="tracker"
-      class="flex flex-col w-full overflow-hidden h-full border border-black"
-    >
+  <!-- Tracker -->
+  <div
+    id="tracker-ui"
+    v-if="tracker"
+    class="flex w-full h-[300px] border border-white bg-sky-800"
+  >
+    <div class="flex flex-col border-r border-white w-[150px]">
       <!-- Options -->
+      <div id="tracker-options" class="flex h-[50px] border-b border-white">
+        <div class="flex">
+          <input
+            type="number"
+            :value="tracker.tracks.length"
+            class="w-[50%] border-r border-white text-center text-3xl text-white bg-sky-400"
+            @change="(e) => changeTracksLength(e)"
+          />
+          <input
+            type="text"
+            class="w-[50%] text-center text-3xl text-white bg-sky-400"
+            :value="tracker.bpm.toString()"
+            @change="(e) => changeTrackerBpm(e)"
+          />
+        </div>
+      </div>
+      <!-- Track list -->
       <div
-        id="tracker-options"
-        class="flex w-full h-[5%] border-b border-black"
+        id="track-list"
+        class="flex flex-col w-full h-full overflow-y-scroll overflow-x-hidden"
       >
-        <input
-          type="number"
-          :value="tracker.tracks.length"
-          class="w-[15%] border-r border-black text-center text-3xl"
-          @change="(e) => changeTracksLength(e)"
-        />
-        <input
-          type="text"
-          class="grow text-center text-3xl"
-          :value="tracker.bpm.toString()"
-          @change="(e) => changeTrackerBpm(e)"
-        />
-      </div>
-      <!-- Tracker board -->
-      <div id="tracker-board" class="flex w-full h-[95%]">
-        <!-- Track list -->
         <div
-          id="track-list"
-          class="flex flex-col w-[15%] border-r border-black overflow-y-scroll overflow-x-hidden"
+          id="track-list-item"
+          v-for="(t, idxT) in tracker.tracks"
+          :key="idxT"
+          class="flex flex-col border-b border-cyan-400 items-start bg-cyan-700"
         >
-          <div
-            id="track-list-item"
-            v-for="(t, idxT) in tracker.tracks"
-            :key="idxT"
-            class="flex flex-col border-b border-black items-start"
-            :style="{ backgroundColor: t.figure ? t.figure.color : '#999999' }"
-          >
-            <label class="block truncate overflow-hidden">
-              {{
-                (tracker.tracks.indexOf(t) + 1).toString() +
-                ": " +
-                t.figure?.name
-              }}
-            </label>
-          </div>
-        </div>
-        <!-- Figures -->
-        <div
-          class="w-[85%] h-full flex flex-wrap overflow-y-scroll content-start"
-        >
-          <!-- Empty button -->
-          <button
-            tabindex="0"
-            class="w-[25%] h-[25%] border-b border-r border-black text-center select-none overflow-hidden grid place-items-center bg-white"
-          >
-            <span class="text-center"> (Empty) </span>
-            <input disabled class="text-center" value="KeyQ" />
-          </button>
-          <!-- Figure buttons -->
-          <button
-            v-for="(f, idxF) in figures"
-            tabindex="0"
-            :key="idxF"
-            class="w-[25%] h-[25%] border-b border-r border-black text-center select-none overflow-hidden grid place-items-center"
-            :style="{ 'background-color': f.color }"
-          >
-            <span class="text-center">
-              {{ f.name }}
-            </span>
-            <input
-              class="text-center"
-              :value="f.keyBind ? f.keyBind : 'Bind to key'"
-              @keydown="(e) => changeSoundKeyBind(e, f)"
-            />
-          </button>
+          <label class="block truncate overflow-hidden italic text-cyan-200">
+            {{
+              (tracker.tracks.indexOf(t) + 1).toString() + ": " + t.figure?.name
+            }}
+          </label>
         </div>
       </div>
+    </div>
+    <!-- Figures -->
+    <div
+      class="w-full h-full flex flex-wrap border-t border-cyan-400 overflow-y-scroll content-start"
+    >
+      <!-- Empty button -->
+      <button
+        tabindex="0"
+        class="w-[200px] h-[150px] border border-cyan-400 text-center select-none overflow-hidden grid bg-cyan-700 ml-1 mt-1"
+      >
+        <span class="italic text-center text-4xl text-cyan-200 place-self-center mt-5"> undefined </span>
+        <input
+          disabled
+          class="text-center text-2xl text-white border-t border-cyan-400 place-self-end w-full bg-sky-400"
+          value="KeyQ"
+        />
+      </button>
+      <!-- Figure buttons -->
+      <button
+        v-for="(f, idxF) in figures"
+        tabindex="0"
+        :key="idxF"
+        class="w-[200px] h-[150px] border border-cyan-400 text-center select-none overflow-hidden grid bg-cyan-700 ml-1 mt-1"
+      >
+        <span class="italic text-center text-4xl text-cyan-200 place-self-center mt-5">
+          {{ f.name }}
+        </span>
+        <input
+          class="text-center text-2xl text-white w-full border-t border-cyan-400 place-self-end bg-sky-400"
+          :value="f.keyBind ? f.keyBind : 'Bind to key'"
+          @keydown="(e) => changeSoundKeyBind(e, f)"
+        />
+      </button>
     </div>
   </div>
 </template>

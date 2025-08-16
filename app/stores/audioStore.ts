@@ -14,6 +14,9 @@ export const useAudioStore = defineStore("audioStore", () => {
   const samples = ref<Sample[]>([]);
   const tracker = ref<Tracker>();
 
+  const activeMixer = ref<Mixer>();
+  const activeTrackIdx = ref<number>(0);
+
   const isPlaying = ref<boolean>(false);
   const cursor = ref<number>(0);
   const currentMeasure = ref<number>(0);
@@ -36,6 +39,8 @@ export const useAudioStore = defineStore("audioStore", () => {
       ],
       mixer: createMixer(audioContext.value),
     };
+
+    activeMixer.value = tracker.value.tracks[0]!.mixer;
   });
 
   async function playSample(s: Sample, velocity: number, melody: number) {
@@ -162,6 +167,8 @@ export const useAudioStore = defineStore("audioStore", () => {
     figures,
     samples,
     tracker,
+    activeMixer,
+    activeTrackIdx,
     isPlaying,
     cursor,
     playSample,

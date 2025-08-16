@@ -8,8 +8,6 @@ const figures = audioStore.figures;
 const activeTrack = ref<Track>(tracks[0]!);
 const isChangingActiveTrack = ref<boolean>(false);
 
-const emit = defineEmits(["changeActiveTrack"]);
-
 function inputActiveTrack(e: Event) {
   const element = e.target as HTMLInputElement;
   element.style.color = "black";
@@ -17,8 +15,10 @@ function inputActiveTrack(e: Event) {
   const idxT = Number(element.value) - 1;
   const t = tracks[idxT];
 
-  if (t) activeTrack.value = t;
-  else element.style.color = "red";
+  if (t) {
+    activeTrack.value = t;
+    audioStore.activeTrackIdx = idxT;
+  } else element.style.color = "red";
 }
 function changeActiveTrack(e: Event) {
   const element = e.target as HTMLInputElement;
@@ -27,7 +27,7 @@ function changeActiveTrack(e: Event) {
 
   if (t) {
     activeTrack.value = t;
-    emit("changeActiveTrack", idxT);
+    audioStore.activeTrackIdx = idxT;
     return;
   } else {
     element.value = (tracks.indexOf(activeTrack.value!) + 1).toString();
@@ -71,6 +71,9 @@ function changeActiveTrackFigure(e: KeyboardEvent) {
   const f = figures.find((_f) => _f.keyBind === e.code);
 
   if (f) activeTrack.value.figure = f;
+}
+function toggleActiveTrackMix() {
+  audioStore.activeMixer = activeTrack.value.mixer;
 }
 function getCursorForDNotes(m: Measure, idxC: number): boolean {
   let colonIndices: number[] = [];
@@ -116,52 +119,47 @@ onMounted(() => {
 <template>
   <div
     id="active-track"
-    class="w-full h-full flex flex-col overflow-hidden border border-black"
-    :style="{
-      backgroundColor: activeTrack.figure
-        ? activeTrack.figure.color
-        : '#999999',
-    }"
+    class="grow w-full h-auto flex flex-col overflow-hidden"
   >
     <div
       id="active-track-options"
-      class="flex w-full h-[5%] border-r border-black"
+      class="flex w-[600px] h-[50px] self-center justify-evenly"
     >
-      <div
-        id="active-track-name"
-        class="w-1/3 text-4xl text-center border-r border-black"
-      >
-        {{ activeTrack?.figure?.name }}
-      </div>
       <input
         id="active-track-input"
         type="number"
-        class="w-1/3 border-r border-black text-center text-4xl"
+        class="w-1/3 border border-white text-white text-center text-3xl bg-sky-400"
         :value="tracks.indexOf(activeTrack) + 1"
         @input="(e) => inputActiveTrack(e)"
         @change="(e) => changeActiveTrack(e)"
         @focus="(e) => selectAllText(e)"
         @keydown.enter="(e) => activeTrackFocus(e)"
-        :style="{
-          backgroundColor: activeTrack.figure
-            ? activeTrack.figure.color
-            : '#999999',
-        }"
       />
       <button
         id="active-track-enable-keys"
-        class="w-1/3 text-4xl"
+        class="w-1/3 italic text-2xl text-white border border-white bg-sky-400"
         @keydown="(e: KeyboardEvent) => changeActiveTrackFigure(e)"
       >
-        (->)
+        -> {{ activeTrack.figure?.name || 'undefined'}} <-
+      </button>
+      <button
+        id="active-track-mix"
+        class="w-1/3 text-white text-3xl border border-white bg-sky-400"
+        @click="toggleActiveTrackMix"
+      >
+        Mix
       </button>
     </div>
     <div
-      v-if="activeTrack?.figure"
       id="active-track-patterns"
-      class="flex flex-col w-full h-[15%] border-l border-r border-white bg-black overflow-y-scroll"
+      class="flex flex-col w-full h-[200px] bg-black overflow-y-scroll"
     >
-      <template v-for="(p, idxP) in activeTrack.figure.patterns" :key="idxP">
+      <div v-if="!activeTrack.figure" class="h-full border border-red"></div>
+      <template
+        v-if="activeTrack.figure"
+        v-for="(p, idxP) in activeTrack.figure.patterns"
+        :key="idxP"
+      >
         <div
           :id="`active-track-pattern-${idxP}`"
           v-for="idxMc in activeTrack.figure.measureCount"

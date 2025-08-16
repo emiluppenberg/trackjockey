@@ -1,66 +1,62 @@
 <script setup lang="ts">
-import type { Mixer } from "~/types2";
 const audioStore = useAudioStore();
 const audioContext = audioStore.audioContext!;
 const tracker = audioStore.tracker!;
-const activeMix = ref<Mixer>();
-const props = defineProps<{
-  activeTrackIdx: number;
-}>();
+const activeMixer = audioStore.activeMixer!;
+const activeTrackIdx = ref<number>(0);
 
-function ChangePitch(e: Event) {
-  if (!activeMix.value) return;
+function changePitch(e: Event) {
+  if (!activeMixer.pitcherNode) return;
 
   const element = e.target as HTMLInputElement;
-  activeMix.value.pitchValue = Number(element.value);
+  activeMixer.pitchValue = Number(element.value);
 
-  if (activeMix.value.pitcherNode)
-    activeMix.value.pitcherNode.parameters.get("pitch")!.value =
-      activeMix.value.pitchValue;
+  activeMixer.pitcherNode.parameters.get("pitch")!.value =
+    activeMixer.pitchValue;
 
   element.select();
 }
-function ActivatePitcherNode(e: KeyboardEvent) {
-  if (!activeMix.value) return;
+function inputPitch(e: Event) {
+  e.preventDefault();
+  const element = e.target as HTMLInputElement;
+  if (!activeMixer.pitcherNode) {
+    element.value = "";
+    return;
+  }
+
+  activeMixer.pitchValue = Number(element.value);
+  activeMixer.pitcherNode.parameters.get("pitch")!.value =
+    activeMixer.pitchValue;
+}
+function activatePitcherNode(e: KeyboardEvent) {
   if (!e.code.includes("Control")) return;
 
-  if (activeMix.value.pitcherNode) activeMix.value.pitcherNode = undefined;
+  if (activeMixer.pitcherNode) activeMixer.pitcherNode = undefined;
   else {
-    activeMix.value.pitcherNode = new AudioWorkletNode(
+    activeMixer.pitcherNode = new AudioWorkletNode(
       audioContext,
       "pitch-processor"
     );
 
-    audioStore.mixerConnectChildToParent(activeMix.value, tracker.mixer);
+    audioStore.mixerConnectChildToParent(activeMixer, tracker.mixer);
   }
 }
-
-watch(
-  () => props.activeTrackIdx,
-  (newIdx) => {
-    activeMix.value = audioStore.tracker!.tracks[newIdx]!.mixer;
-  }
-);
 </script>
 
 <template>
-  <!-- Right -->
-  <div
-    v-if="activeMix"
-    id="active-track-mixer-container"
-    class="h-full border-l border-white bg-blue-600"
-  >
+  <div id="active-mixer" class="w-full bg-blue-600">
     <input
-      id="active-track-pitch"
+      id="pitch"
       type="number"
-      :value="activeMix.pitchValue"
+      :value="activeMixer.pitchValue"
       class="w-[20%] h-[25%] border-b border-r border-white"
       :class="{
-        'bg-green-600': activeMix.pitcherNode,
-        'bg-red-600': !activeMix.pitcherNode,
+        'bg-green-600': activeMixer.pitcherNode,
+        'bg-red-600': !activeMixer.pitcherNode,
       }"
-      @keydown="(e) => ActivatePitcherNode(e)"
-      @change="(e) => ChangePitch(e)"
+      @keydown="(e) => activatePitcherNode(e)"
+      @change="(e) => changePitch(e)"
+      @input="(e) => inputPitch(e)"
     />
   </div>
 </template>
