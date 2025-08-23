@@ -1,8 +1,8 @@
 export type Measure = {
   index: number;
-  rNotes: string;
-  mNotes: string[];
-  fNotes: string;
+  vNotes: string;
+  m64Notes: string[]; // Number instead?
+  v64Notes: string;
 };
 
 export type Sample = {
@@ -16,10 +16,8 @@ export type Sample = {
 
 export type Figure = {
   name: string;
-  color: string;
   keyBind?: string;
   measureCount: number;
-  tempo: number;
   patterns: Pattern[];
   mixer: Mixer;
 };
@@ -106,22 +104,191 @@ export function createPattern(
 
 export function createFigure(
   name: string,
-  color: string,
   keyBind: string,
   measureCount: number,
-  tempo: number,
   patterns: Pattern[],
   audioContext: AudioContext
 ): Figure {
   return {
     name: name,
-    color: color,
     keyBind: keyBind,
     measureCount: measureCount,
-    tempo: tempo,
     patterns: patterns,
     mixer: createMixer(audioContext),
   };
+}
+
+export function convertTo64Rhythm(vNotes: string): string {
+  const fLen = 64 / vNotes.length;
+  let v64Notes = "";
+  let fIdx = 0;
+
+  const formatNotes = (c: string) => {
+    v64Notes += c;
+    for (let j = fIdx + 1; j < fLen + fIdx; j++) {
+      v64Notes += "-";
+    }
+    fIdx += fLen;
+  };
+
+  for (let i = 0; i < vNotes.length; i++) {
+    const c = vNotes.charAt(i);
+    switch (c) {
+      case "1":
+        formatNotes(c);
+        break;
+      case "2":
+        formatNotes(c);
+        break;
+      case "3":
+        formatNotes(c);
+        break;
+      case "4":
+        formatNotes(c);
+        break;
+      case "5":
+        formatNotes(c);
+        break;
+      case "6":
+        formatNotes(c);
+        break;
+      case "7":
+        formatNotes(c);
+        break;
+      case "8":
+        formatNotes(c);
+        break;
+      case "9":
+        formatNotes(c);
+        break;
+      case "X":
+        formatNotes(c);
+        break;
+      case "-":
+        formatNotes(c);
+        break;
+      case ":":
+        break;
+      default:
+        alert("Invalid note input (character) conversion");
+        return "";
+    }
+  }
+
+  return v64Notes;
+}
+
+export function initialize64Melody(vNotes: string): string[] {
+  const fLen = 64 / vNotes.length;
+  let m64Notes: string[] = [];
+  let fIdx = 0;
+
+  const formatNotes = (c: string) => {
+    if (Number(c)) {
+      m64Notes.push("0");
+    } else {
+      m64Notes.push(c);
+    }
+
+    for (let j = fIdx + 1; j < fLen + fIdx; j++) {
+      m64Notes.push("-");
+    }
+    fIdx += fLen;
+  };
+
+  for (let i = 0; i < vNotes.length; i++) {
+    const c = vNotes.charAt(i);
+    switch (c) {
+      case "1":
+        formatNotes(c);
+        break;
+      case "2":
+        formatNotes(c);
+        break;
+      case "3":
+        formatNotes(c);
+        break;
+      case "4":
+        formatNotes(c);
+        break;
+      case "5":
+        formatNotes(c);
+        break;
+      case "6":
+        formatNotes(c);
+        break;
+      case "7":
+        formatNotes(c);
+        break;
+      case "8":
+        formatNotes(c);
+        break;
+      case "9":
+        formatNotes(c);
+        break;
+      case "X":
+        formatNotes(c);
+        break;
+      case "-":
+        formatNotes(c);
+        break;
+      case ":":
+        break;
+      default:
+        alert("Invalid note input (character) conversion");
+        return [];
+    }
+  }
+
+  return m64Notes;
+}
+
+export function getMelodyIndex(idxC: number, vNotes: string): number {
+  let idxM = 0;
+  let _vNotes = "";
+
+  for (let i = 0; i < idxC; i++) {
+    const c = vNotes.charAt(i);
+    if (c !== ":") idxM++;
+  }
+
+  for (let i = 0; i < vNotes.length; i++) {
+    const c = vNotes.charAt(i);
+    if (c !== ":") _vNotes += c;
+  }
+
+  const fLen = 64 / _vNotes.length;
+  return fLen * idxM;
+}
+
+export function getCursorForVNotes(m: Measure, idxC: number): boolean {
+  const audioStore = useAudioStore()
+  let colonIndices: number[] = [];
+  let currentNoteIdx: number = idxC;
+
+  for (let i = 0; i < m.vNotes.length; i++) {
+    if (m.vNotes[i] === ":") colonIndices.push(i);
+  }
+
+  if (colonIndices.includes(idxC)) return false;
+
+  for (const colonIdx of colonIndices) {
+    if (idxC > colonIdx) currentNoteIdx -= 1;
+  }
+
+  const vNotesClean = m.vNotes.replaceAll(":", "");
+  const fLen = 64 / vNotesClean.length;
+  const nextNoteIdx = currentNoteIdx + 1;
+
+  if (audioStore.cursor === currentNoteIdx * fLen) return true;
+
+  if (
+    audioStore.cursor < nextNoteIdx * fLen &&
+    audioStore.cursor > currentNoteIdx * fLen
+  )
+    return true;
+
+  return false;
 }
 // Ignore below
 

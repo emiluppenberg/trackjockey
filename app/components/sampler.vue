@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Sample } from "~/types2";
+import { createSample } from "~/types2";
 const audioStore = useAudioStore();
 const samples = audioStore.samples;
 const audioContext = audioStore.audioContext!;
@@ -15,16 +15,13 @@ async function addSample() {
     const audioBuffer = await audioContext.decodeAudioData(
       await newFile.arrayBuffer()
     );
-    samples.push({
-      audioBuffer: audioBuffer,
-      name: newFile.name,
-    });
+    samples.push(createSample(audioBuffer, newFile.name, audioContext));
   }
 }
 </script>
 
 <template>
-  <div class="flex flex-col w-[50%] h-full items-center">
+  <div class="flex flex-col h-auto items-center">
     <!-- Samples board -->
     <div
       class="w-full h-[50%] border-b border-black flex flex-wrap overflow-y-scroll content-start"
@@ -44,7 +41,9 @@ async function addSample() {
             }
           "
         />
-        <button class="grow text-4xl" @click="emits('playSample', s, '5')">(->)</button>
+        <button class="grow text-4xl" @click="emits('playSample', s, '5')">
+          (->)
+        </button>
       </div>
       <!-- New sample -->
       <div class="relative w-[25%] h-[25%]">

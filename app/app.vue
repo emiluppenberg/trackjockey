@@ -1,7 +1,7 @@
 <script setup lang="ts">
 useHead({
   bodyAttrs: {
-    class: "bg-emerald-300",
+    class: "bg-slate-400",
   },
 });
 </script>
@@ -25,11 +25,18 @@ input[type="number"] {
   -moz-appearance: textfield;
 }
 
-.bg-color1 {
-  background-color: #B0C6CE;
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
 }
 
-.input-color1 {
-  background-color: #b0c6ce1e;
+::-webkit-scrollbar-track {
+  background-color: #065f46;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #14b8a6;
+  border-radius: 10px;
+  width: 50px;
 }
 </style>

@@ -4,11 +4,13 @@ const audioStore = useAudioStore();
 
 <template>
   <div class="flex flex-col w-screen h-auto overflow-y-scroll">
-    <Tracker class="mt-[50px] mb-[50px]"></Tracker>
-    <Mixer
+    <button @click="audioStore.loadFigures">Load</button>
+    <Tracker class="mx-[30px] my-[50px]"></Tracker>
+    <!-- <Mixer
       v-if="audioStore.audioContext && audioStore.tracker"
-      class="w-[50%]"
-    ></Mixer>
-    <Editor></Editor>
+      class="w-auto mx-[30px]"
+    ></Mixer> -->
+    <Figures class="mx-[30px] my-[50px]"></Figures>
+    <Sampler v-if="audioStore.audioContext" class="mx-[30px]"></Sampler>
   </div>
 </template>
