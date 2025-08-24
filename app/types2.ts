@@ -1,5 +1,4 @@
 export type Measure = {
-  index: number;
   vNotes: string;
   m64Notes: string[]; // Number instead?
   v64Notes: string;
@@ -37,6 +36,7 @@ export type Tracker = {
 
 export type Track = {
   figure?: Figure;
+  currentMeasureIdx: number;
   mixer: Mixer;
 };
 
@@ -261,7 +261,7 @@ export function getMelodyIndex(idxC: number, vNotes: string): number {
   return fLen * idxM;
 }
 
-export function getCursorForVNotes(m: Measure, idxC: number): boolean {
+export function getCursorForVNotes(m: Measure, idxC: number, idxM: number): boolean {
   const audioStore = useAudioStore()
   let colonIndices: number[] = [];
   let currentNoteIdx: number = idxC;
@@ -279,6 +279,8 @@ export function getCursorForVNotes(m: Measure, idxC: number): boolean {
   const vNotesClean = m.vNotes.replaceAll(":", "");
   const fLen = 64 / vNotesClean.length;
   const nextNoteIdx = currentNoteIdx + 1;
+
+  if (audioStore.currentMeasureIdx !== idxM) return false;
 
   if (audioStore.cursor === currentNoteIdx * fLen) return true;
 

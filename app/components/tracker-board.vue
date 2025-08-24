@@ -24,11 +24,11 @@ function changeSoundKeyBind(e: KeyboardEvent, sound: Figure | Sample) {
     <!-- Tracker board -->
   <div
     id="tracker-board"
-    class="flex border-b border-r border-white"
+    class="flex border-b"
   >
     <!-- Figures -->
     <div
-      class="w-full h-full flex flex-wrap border-t border-cyan-400 overflow-y-auto content-start"
+      class="w-full h-full flex flex-wrap content-start mb-1"
     >
       <!-- Empty button -->
       <button

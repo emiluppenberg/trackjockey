@@ -36,9 +36,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <div id="tracker-menu" class="flex flex-col border border-white">
+  <div id="tracker-menu" class="flex border-b border-white">
     <!-- Active track -->
-    <TrackerActive v-if="audioStore.activeTrack"></TrackerActive>
     <TrackerList></TrackerList>
   </div>
 </template>

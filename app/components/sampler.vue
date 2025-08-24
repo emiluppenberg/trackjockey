@@ -4,8 +4,6 @@ const audioStore = useAudioStore();
 const samples = audioStore.samples;
 const audioContext = audioStore.audioContext!;
 
-const emits = defineEmits(["playSample"]);
-
 async function addSample() {
   const newFile = (
     document.getElementById("newsample-file-input") as HTMLInputElement
@@ -16,6 +14,20 @@ async function addSample() {
       await newFile.arrayBuffer()
     );
     samples.push(createSample(audioBuffer, newFile.name, audioContext));
+  }
+}
+async function changeSample(idxS: number) {
+  const newFile = (
+    document.getElementById(`sample-${idxS}-file-input`) as HTMLInputElement
+  ).files?.item(0);
+
+  if (newFile) {
+    const audioBuffer = await audioContext.decodeAudioData(
+      await newFile.arrayBuffer()
+    );
+
+    if (audioStore.samples[idxS])
+      audioStore.samples[idxS].audioBuffer = audioBuffer;
   }
 }
 </script>
@@ -41,9 +53,21 @@ async function addSample() {
             }
           "
         />
-        <button class="grow text-4xl" @click="emits('playSample', s, '5')">
-          (->)
-        </button>
+        <div class="relative w-full h-full">
+          <input
+            :id="`sample-${idxS}-file-input`"
+            tabindex="0"
+            class="absolute inset-0 w-full h-full opacity-0 cursor-pointer peer"
+            type="file"
+            accepts="audio/*"
+            @change="changeSample(idxS)"
+          />
+          <div
+            class="w-full h-full border-b border-r border-black text-center select-none overflow-hidden grid place-items-center bg-blue-600 peer-focus:ring-2 peer-focus:ring-blue-600"
+          >
+            <span class="text-center text-4xl">FILE</span>
+          </div>
+        </div>
       </div>
       <!-- New sample -->
       <div class="relative w-[25%] h-[25%]">
@@ -54,7 +78,6 @@ async function addSample() {
           type="file"
           accepts="audio/*"
           @change="addSample"
-          @focus="console.log('focus')"
         />
         <div
           class="w-full h-full border-b border-r border-black text-center select-none overflow-hidden grid place-items-center bg-blue-600 peer-focus:ring-2 peer-focus:ring-blue-600"

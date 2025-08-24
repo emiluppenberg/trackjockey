@@ -1,57 +1,91 @@
 <script setup lang="ts">
-import { type Measure, getCursorForVNotes } from '~/types2';
+import { getCursorForVNotes, getMelodyIndex } from "~/types2";
 
 const audioStore = useAudioStore();
-
-
+const viewMode = ref<boolean>(false);
 </script>
 
 <template>
-    <div
-      id="active-track-patterns"
-      class="flex flex-col bg-black border border-white overflow-y-auto"
+  <div
+    id="tracker-active-patterns-container"
+    v-if="audioStore.activeTrack && audioStore.activeTrack.figure"
+    class="flex flex-col bg-slate-900"
+  >
+    <button
+      class="w-full bg-indigo-700 h-[40px] text-white border-b"
+      @click="viewMode = !viewMode"
     >
-      <template
-        v-if="audioStore.activeTrack && audioStore.activeTrack.figure"
-        v-for="(p, idxP) in audioStore.activeTrack.figure.patterns"
-        :key="idxP"
+      Pitch/Velocity
+    </button>
+    <div class="flex w-full">
+      <!-- Pattern mute buttons -->
+      <div
+        id="tracker-active-mute-buttons"
+        class="flex flex-col w-[100px] border-r border-white"
+      >
+        <button
+          v-for="(p, idxP) in audioStore.activeTrack?.figure.patterns"
+          class="h-[40px] text-center overflow-x-hidden border-b border-white"
+          :class="{ 'bg-green-600': !p.mute, 'bg-red-600': p.mute }"
+          @click="
+            () => {
+              p.mute = !p.mute;
+            }
+          "
+        >
+          {{ p.sample.name }}
+        </button>
+      </div>
+      <!-- Patterns and measures -->
+      <div
+        id="tracker-active-patterns"
+        class="max-w-[1800px] flex flex-col bg-black overflow-x-auto"
       >
         <div
-          :id="`active-track-pattern-${idxP}`"
-          v-for="idxMc in audioStore.activeTrack.figure.measureCount"
-          :key="idxMc"
-          class="flex border-b border-white bg-black text-white h-[40px]"
+          :id="`tracker-active-pattern-${idxP}`"
+          v-for="(p, idxP) in audioStore.activeTrack.figure.patterns"
+          class="flex border-cyan-400 bg-black text-white h-[40px]"
         >
-          <button
-            class="text-center w-[100px] overflow-x-hidden border-r border-white"
-            :class="{ 'bg-green-600': !p.mute, 'bg-red-600': p.mute }"
-            @click="
-              () => {
-                p.mute = !p.mute;
-              }
-            "
-          >
-            {{ p.sample.name }}
-          </button>
           <div
-            :id="`active-track-pattern-${idxP}-measure-${idxMc}`"
-            class="grow flex max-w-[45%] border-r border-white justify-between items-center px-1"
+            v-for="(m, idxM) in p.measures"
+            :id="`tracker-active-pattern-${idxP}-measure-${idxM}`"
+            class="flex min-w-[400px] max-w-[400px] border-b border-r border-cyan-400 justify-between items-center text-2xl"
           >
-            <p
-              v-for="(c, idxC) in p.measures.find((m) => m.index === idxMc)
-                ?.vNotes"
-              class="text-center text-2xl"
+            <!-- Velocity -->
+            <div
+              v-for="(c, idxC) in m.vNotes"
+              class="text-center w-[2em]"
               :class="{
-                'text-emerald-600': getCursorForVNotes(
-                  p.measures.find((m) => m.index === idxMc)!,
-                  idxC
-                ),
+                'text-emerald-600': getCursorForVNotes(m, idxC, idxM),
+                hidden: !viewMode,
               }"
             >
               {{ c }}
-            </p>
+            </div>
+            <!-- Melody -->
+            <div
+              v-for="(c, idxC) in m.vNotes"
+              class="text-center w-[2em]"
+              :class="{
+                'text-emerald-600': getCursorForVNotes(m, idxC, idxM),
+                hidden: viewMode,
+              }"
+            >
+              <!-- Value -->
+              <div
+                v-if="Number(c)"
+                class="flex italic text-xs text-center justify-center border-l border-cyan-400"
+              >
+                {{ m.m64Notes[getMelodyIndex(idxC, m.vNotes)] }}
+              </div>
+              <!-- NonValue -->
+              <div v-else class="w-full h-full flex justify-center">
+                <div class="text-xs text-center">{{ c }}</div>
+              </div>
+            </div>
           </div>
         </div>
-      </template>
+      </div>
     </div>
+  </div>
 </template>

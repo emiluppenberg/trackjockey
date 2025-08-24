@@ -36,10 +36,10 @@ function handleFocusOutFigure(e: Event) {
 </script>
 
 <template>
-  <div id="figures-list" class="flex min-h-[100px] border border-white">
+  <div id="figures-list" class="flex min-h-[100px] border-b">
     <!-- New button -->
     <button
-      class="min-w-[100px] border-r border-white text-center text-3xl text-white bg-sky-400 focus:bg-sky-200"
+      class="min-w-[100px] border-r border-white text-center text-3xl text-white"
       @click="addFigure"
     >
       +

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { createMixer } from '~/types2';
+import { createMixer } from "~/types2";
 
 const audioStore = useAudioStore();
 const tracker = audioStore.tracker!;
@@ -39,16 +39,32 @@ function changeTracksLength(e: Event) {
 </script>
 
 <template>
+  <div class="flex">
+    <!-- Options -->
+    <div id="tracker-options" class="flex flex-col w-[100px] h-[70px]">
+      <input
+        type="number"
+        :value="tracker.tracks.length"
+        class="w-[100px] border-r border-b border-white text-center text-3xl text-white bg-sky-400 focus:bg-sky-200"
+        @change="(e) => changeTracksLength(e)"
+      />
+      <input
+        type="text"
+        class="w-[100px] border-r border-white text-center text-3xl text-white bg-sky-400 focus:bg-sky-200"
+        :value="tracker.bpm.toString()"
+        @change="(e) => changeTrackerBpm(e)"
+      />
+    </div>
     <!-- Track list -->
     <div
       id="tracker-list"
-      class="flex flex-col w-full h-full overflow-y-auto overflow-x-hidden"
+      class="flex w-full h-[70px] overflow-x-auto overflow-y-hidden"
     >
       <div
         id="tracker-list-item"
         v-for="(t, idxT) in tracker.tracks"
         :key="idxT"
-        class="flex flex-col border-b border-cyan-400 items-start"
+        class="min-w-[150px] h-[70px] flex flex-col border-r border-cyan-400 items-center overflow-hidden"
         :class="{
           'bg-cyan-700': t !== audioStore.activeTrack,
           'bg-lime-700': t === audioStore.activeTrack,
@@ -56,33 +72,24 @@ function changeTracksLength(e: Event) {
         @click="audioStore.activeTrack = t"
       >
         <label
-          class="block truncate overflow-hidden italic"
+          class="text-3xl text-center"
           :class="{
             'text-cyan-200': t !== audioStore.activeTrack,
             'text-lime-200': t === audioStore.activeTrack,
           }"
         >
-          {{
-            (tracker.tracks.indexOf(t) + 1).toString() + ": " + t.figure?.name
-          }}
+          {{ (tracker.tracks.indexOf(t) + 1).toString() }}
         </label>
+        <div
+          class="max-w-[130px] italic text-2xl text-center truncate pointer-events-none focus:outline-none"
+          :class="{
+            'text-cyan-200': t !== audioStore.activeTrack,
+            'text-lime-200': t === audioStore.activeTrack,
+          }"
+        >
+          {{ t.figure?.name || "undefined" }}
+        </div>
       </div>
     </div>
-    <!-- Options -->
-    <div id="tracker-options" class="flex h-[50px] border-t border-white">
-      <div class="flex">
-        <input
-          type="number"
-          :value="tracker.tracks.length"
-          class="w-[75px] border-r border-white text-center text-3xl text-white bg-sky-400 focus:bg-sky-200"
-          @change="(e) => changeTracksLength(e)"
-        />
-        <input
-          type="text"
-          class="w-[75px] text-center text-3xl text-white bg-sky-400 focus:bg-sky-200"
-          :value="tracker.bpm.toString()"
-          @change="(e) => changeTrackerBpm(e)"
-        />
-      </div>
-    </div>
+  </div>
 </template>

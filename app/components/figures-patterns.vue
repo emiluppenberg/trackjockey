@@ -9,68 +9,106 @@ function addPattern() {
   if (!audioStore.activeFigure) return;
   if (!audioStore.audioContext) return;
 
+  const measures = [];
+
+  for (let i = 0; i < audioStore.activeFigure.measureCount; i++) {
+    measures.push({ vNotes: "", m64Notes: [], v64Notes: "" });
+  }
+
   audioStore.activeFigure.patterns.push(
-    createPattern(audioStore.samples[0]!, [], audioStore.audioContext)
+    createPattern(audioStore.samples[0]!, measures, audioStore.audioContext)
   );
+}
+function removePattern(idxP: number) {
+  if (!audioStore.activeFigure) return;
+
+  audioStore.activeFigure.patterns.splice(idxP, 1);
+}
+
+function addMeasure() {
+  if (!audioStore.activeFigure) return;
+
+  audioStore.activeFigure.measureCount++;
+
+  audioStore.activeFigure.patterns.forEach((p) =>
+    p.measures.push({ vNotes: "", m64Notes: [], v64Notes: "" })
+  );
+}
+function removeMeasure() {
+  if (!audioStore.activeFigure) return;
+
+  audioStore.activeFigure.measureCount--;
+
+  audioStore.activeFigure.patterns.forEach((p) => p.measures.pop());
 }
 </script>
 
 <template>
-  <div
-    class="min-h-[600px] w-full bg-black text-white border-r border-b border-l border-white"
-  >
+  <div class="h-auto w-full bg-slate-900 text-white">
     <button
-      class="w-full min-h-[40px] border-b border-white bg-indigo-700"
+      class="w-full min-h-[40px] bg-indigo-700 border-b"
       @click="editMode = !editMode"
     >
       Pitch/Velocity
     </button>
-    <div v-if="audioStore.activeFigure" class="flex w-full">
-      <!-- Pattern sample -->
-      <div class="flex flex-col w-[100px]">
-        <div
-          :id="`pattern-${idxP}-sample`"
-          v-for="(p, idxP) in audioStore.activeFigure.patterns"
-          class="w-full h-[40px] border-r border-b border-white"
-        >
-          <select
-            v-model="p.sample"
-            class="w-full h-full text-center bg-blue-600"
+    <div id="patterns-editor-container" class="flex justify-between w-full">
+      <div
+        id="patterns-editor"
+        v-if="audioStore.activeFigure"
+        class="flex w-full"
+      >
+        <!-- Pattern sample -->
+        <div class="flex flex-col w-[100px]">
+          <div
+            :id="`pattern-${idxP}-sample`"
+            v-for="(p, idxP) in audioStore.activeFigure.patterns"
+            class="flex w-full h-[40px] border-r border-b border-white"
           >
-            <option
-              v-for="(s, idxS) in audioStore.samples"
-              :key="idxS"
-              class="bg-blue-600"
-              :value="s"
+            <button
+              class="w-[30px] h-full text-center bg-red-600 border-r"
+              @click="removePattern(idxP)"
             >
-              {{ s.name }}
-            </option>
-          </select>
+              -
+            </button>
+            <select
+              v-model="p.sample"
+              class="w-[70px] h-full text-center bg-blue-600"
+            >
+              <option
+                v-for="(s, idxS) in audioStore.samples"
+                :key="idxS"
+                class="bg-blue-600"
+                :value="s"
+              >
+                {{ s.name }}
+              </option>
+            </select>
+          </div>
         </div>
-        <!-- New pattern -->
-        <button
-          class="min-w-[100px] h-[40px] border-r border-b border-white bg-sky-400 focus:bg-sky-200"
-          @click="addPattern"
-        >
-          +
-        </button>
+        <FiguresPatternsEditor :edit-mode="editMode"></FiguresPatternsEditor>
       </div>
-      <FiguresPatternsEditor :edit-mode="editMode"></FiguresPatternsEditor>
       <!-- +/- Measure buttons -->
-      <div class="flex flex-col w-[100px]">
+      <div class="flex flex-col max-w-[100px]">
         <button
-          @click="audioStore.activeFigure.measureCount += 1"
+          @click="addMeasure"
           class="bg-sky-400 focus:bg-sky-200 h-1/2 min-w-[100px] border-b border-l"
         >
           +
         </button>
         <button
-          @click="audioStore.activeFigure.measureCount -= 1"
+          @click="removeMeasure"
           class="bg-sky-400 focus:bg-sky-200 h-1/2 min-w-[100px] border-b border-l"
         >
           -
         </button>
       </div>
     </div>
+    <!-- New pattern -->
+    <button
+      class="min-w-[100px] h-[40px] border-r bg-sky-400 focus:bg-sky-200"
+      @click="addPattern"
+    >
+      +
+    </button>
   </div>
 </template>

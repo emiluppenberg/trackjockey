@@ -9,7 +9,7 @@ const figures = audioStore.figures;
 function handleActiveInputKeyDown(e: KeyboardEvent) {
   const key = e.key;
   const element = e.target as HTMLButtonElement;
-  element.style.color = "black";
+  element.style.color = "white";
   
   if (key === "Tab") return;
   e.preventDefault();
@@ -87,17 +87,17 @@ onMounted(() => {
 </script>
 
 <template>
-  <div id="tracker-active" class="flex h-[50px] border-b border-white">
+  <div id="tracker-active" class="flex h-[40px] border-t border-b border-white">
     <button
       id="active-input"
-    class="w-[75px] border-r border-white text-white text-center text-3xl bg-sky-400 focus:bg-sky-200 select-text"
+    class="w-[950px] border-r border-white text-white text-center text-3xl bg-indigo-700 focus:bg-indigo-400 select-text"
       @keydown="(e) => handleActiveInputKeyDown(e)"
     >
       {{ tracks.indexOf(audioStore.activeTrack!) + 1 }}
     </button>
     <button
       id="active-mix"
-      class="w-[75px] text-white text-3xl bg-sky-400 focus:bg-sky-200"
+      class="w-[950px] text-white text-3xl bg-indigo-700 focus:bg-indigo-400"
       @click="toggleActiveTrackMix"
     >
       MIX

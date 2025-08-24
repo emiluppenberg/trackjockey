@@ -3,7 +3,8 @@ const audioStore = useAudioStore();
 </script>
 
 <template>
-  <div class="flex flex-col w-auto h-auto bg-sky-800">
+  <!-- Figures.vue -->
+  <div class="flex flex-col w-[1900px] h-auto bg-sky-800 border">
     <FiguresList v-if="audioStore.audioContext"></FiguresList>
     <FiguresPatterns v-if="audioStore.audioContext"></FiguresPatterns>
   </div>

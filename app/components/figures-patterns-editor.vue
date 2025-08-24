@@ -19,7 +19,6 @@ function handleEditMeasureRhythm(idxP: number, idxMc: number, m: Measure) {
   if (textarea) {
     textarea.classList.remove("hidden");
     textarea.focus();
-    textarea.select();
   }
 }
 
@@ -82,7 +81,7 @@ function inputMeasureNotation(e: Event, m: Measure) {
   <div
     v-if="audioStore.activeFigure"
     id="pattern-columns"
-    class="w-auto h-full flex flex-col items-start overflow-x-auto"
+    class="max-w-[1700px] flex flex-col items-start overflow-x-auto bg-black"
   >
     <div
       id="pattern"
@@ -92,40 +91,20 @@ function inputMeasureNotation(e: Event, m: Measure) {
       <!-- Pattern measures -->
       <div id="pattern-measures" class="w-full h-full flex justify-start">
         <div
-          :id="`pattern-measure-${idxMc}`"
-          v-for="idxMc in audioStore.activeFigure.measureCount"
-          :key="idxMc"
+          :id="`pattern-measure-${idxM}`"
+          v-for="(m, idxM) in p.measures"
+          :key="idxM"
           class="min-w-[400px] max-w-[400px] h-full flex"
-          :style="{
-            width: 100 / audioStore.activeFigure.measureCount + '%',
-          }"
         >
-          <!-- Initialize measure button -->
-          <button
-            v-if="!p.measures.some((m) => m.index === idxMc)"
-            class="w-full h-full border-b border-r border-white text-2xl"
-            @click="
-              p.measures.push({
-                index: idxMc,
-                vNotes: '',
-                m64Notes: [],
-                v64Notes: '',
-              })
-            "
-          >
-            +
-          </button>
-          <template v-for="m in p.measures">
             <!-- Measure -->
             <div
-              v-if="m.index === idxMc"
               class="w-full flex flex-col border-r border-cyan-400"
             >
               <!-- Textarea/Hidden -->
               <textarea
-                :id="`pattern-${idxP}-measure-${idxMc}-rhythm-textarea`"
+                :id="`pattern-${idxP}-measure-${idxM}-rhythm-textarea`"
                 type="text"
-                class="w-full field-sizing-content text-center text-2xl content-center bg-black text-white"
+                class="w-full field-sizing-content text-center text-xl content-center bg-black text-white"
                 rows="1"
                 :class="{ hidden: editMeasure !== m }"
                 :value="m.vNotes"
@@ -141,7 +120,7 @@ function inputMeasureNotation(e: Event, m: Measure) {
                 <div
                   tabindex="0"
                   class="w-full h-full flex items-center justify-evenly text-2xl"
-                  @focus="handleEditMeasureRhythm(idxP, idxMc, m)"
+                  @focus="handleEditMeasureRhythm(idxP, idxM, m)"
                 >
                   <div
                     v-for="(c, idxC) in m.vNotes"
@@ -171,13 +150,6 @@ function inputMeasureNotation(e: Event, m: Measure) {
                         type="number"
                         class="opacity-0 absolute inset-0 peer"
                         v-model="m.m64Notes[getMelodyIndex(idxC, m.vNotes)]"
-                        @change="
-                          console.log(
-                            audioStore.activeFigure.patterns[
-                              idxP
-                            ]?.measures.find((m) => m.index === idxMc)?.m64Notes
-                          )
-                        "
                       />
                       <div
                         class="flex italic text-xs text-center justify-center border-l border-cyan-400 peer-focus:ring-0 peer-focus:bg-lime-700 peer-focus:text-lime-200"
@@ -196,7 +168,6 @@ function inputMeasureNotation(e: Event, m: Measure) {
                 </div>
               </div>
             </div>
-          </template>
         </div>
       </div>
     </div>

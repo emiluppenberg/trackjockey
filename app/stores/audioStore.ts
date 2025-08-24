@@ -26,7 +26,7 @@ export const useAudioStore = defineStore("audioStore", () => {
 
   const isPlaying = ref<boolean>(false);
   const cursor = ref<number>(0);
-  const currentMeasure = ref<number>(0);
+  const currentMeasureIdx = ref<number>(0);
 
   onMounted(async () => {
     audioContext.value = new AudioContext();
@@ -38,6 +38,7 @@ export const useAudioStore = defineStore("audioStore", () => {
         {
           figure: undefined,
           mixer: createMixer(audioContext.value),
+          currentMeasureIdx: 0
         },
       ],
       mixer: createMixer(audioContext.value),
@@ -46,149 +47,163 @@ export const useAudioStore = defineStore("audioStore", () => {
     activeMixer.value = tracker.value.tracks[0]!.mixer;
     activeTrack.value = tracker.value.tracks[0]!;
   });
-  
-async function loadFigures() {
-  if (!audioContext.value) return;
 
-  const hihat1 = await fetch(
-    new URL("~/assets/HH_AcardeBullet11.wav/", import.meta.url).href
-  )
-    .then((response) => response.arrayBuffer())
-    .then((arrayBuffer) => audioContext.value!.decodeAudioData(arrayBuffer));
+  async function loadFigures() {
+    if (!audioContext.value) return;
 
-  const hihat2 = await fetch(
-    new URL("~/assets/HH_AcardeBullet41.wav/", import.meta.url).href
-  )
-    .then((response) => response.arrayBuffer())
-    .then((arrayBuffer) => audioContext.value!.decodeAudioData(arrayBuffer)!);
+    const hihat1 = await fetch(
+      new URL("~/assets/HH_AcardeBullet11.wav/", import.meta.url).href
+    )
+      .then((response) => response.arrayBuffer())
+      .then((arrayBuffer) => audioContext.value!.decodeAudioData(arrayBuffer));
 
-  const kick1 = await fetch(
-    new URL("~/assets/Tom_BleepBullet3.wav/", import.meta.url).href
-  )
-    .then((response) => response.arrayBuffer())
-    .then((arrayBuffer) => audioContext.value!.decodeAudioData(arrayBuffer)!);
+    const hihat2 = await fetch(
+      new URL("~/assets/HH_AcardeBullet41.wav/", import.meta.url).href
+    )
+      .then((response) => response.arrayBuffer())
+      .then((arrayBuffer) => audioContext.value!.decodeAudioData(arrayBuffer)!);
 
-  const kick2 = await fetch(
-    new URL("~/assets/BD_KastleBullet1.wav/", import.meta.url).href
-  )
-    .then((response) => response.arrayBuffer())
-    .then((arrayBuffer) => audioContext.value!.decodeAudioData(arrayBuffer)!);
+    const kick1 = await fetch(
+      new URL("~/assets/Tom_BleepBullet3.wav/", import.meta.url).href
+    )
+      .then((response) => response.arrayBuffer())
+      .then((arrayBuffer) => audioContext.value!.decodeAudioData(arrayBuffer)!);
 
-  const snare1 = await fetch(
-    new URL("~/assets/SD_KastleBullet6.wav/", import.meta.url).href
-  )
-    .then((response) => response.arrayBuffer())
-    .then((arrayBuffer) => audioContext.value!.decodeAudioData(arrayBuffer)!);
+    const kick2 = await fetch(
+      new URL("~/assets/BD_KastleBullet1.wav/", import.meta.url).href
+    )
+      .then((response) => response.arrayBuffer())
+      .then((arrayBuffer) => audioContext.value!.decodeAudioData(arrayBuffer)!);
 
-  const snare2 = await fetch(
-    new URL("~/assets/SD_LunchBullet4.wav/", import.meta.url).href
-  )
-    .then((response) => response.arrayBuffer())
-    .then((arrayBuffer) => audioContext.value!.decodeAudioData(arrayBuffer)!);
+    const snare1 = await fetch(
+      new URL("~/assets/SD_KastleBullet6.wav/", import.meta.url).href
+    )
+      .then((response) => response.arrayBuffer())
+      .then((arrayBuffer) => audioContext.value!.decodeAudioData(arrayBuffer)!);
 
-  const arp1 = await fetch(
-    new URL("~/assets/ArpFallST_AcardeBullet002.wav/", import.meta.url).href
-  )
-    .then((response) => response.arrayBuffer())
-    .then((arrayBuffer) => audioContext.value!.decodeAudioData(arrayBuffer)!);
+    const snare2 = await fetch(
+      new URL("~/assets/SD_LunchBullet4.wav/", import.meta.url).href
+    )
+      .then((response) => response.arrayBuffer())
+      .then((arrayBuffer) => audioContext.value!.decodeAudioData(arrayBuffer)!);
 
-  for (const s of samples.value) {
-    samples.value.pop();
-  }
+    const arp1 = await fetch(
+      new URL("~/assets/ArpFallST_AcardeBullet002.wav/", import.meta.url).href
+    )
+      .then((response) => response.arrayBuffer())
+      .then((arrayBuffer) => audioContext.value!.decodeAudioData(arrayBuffer)!);
 
-  for (const f of figures.value) {
-    figures.value.pop();
-  }
-
-  samples.value.push(createSample(kick1, "kick1", audioContext.value));
-  samples.value.push(createSample(hihat1, "hihat1", audioContext.value));
-  samples.value.push(createSample(snare1, "snare1", audioContext.value));
-  samples.value.push(createSample(kick2, "kick2", audioContext.value));
-  samples.value.push(createSample(hihat2, "hihat2", audioContext.value));
-  samples.value.push(createSample(snare2, "kick2", audioContext.value));
-  samples.value.push(createSample(arp1, "arp1", audioContext.value));
-
-  for (let i = 0; i < 3; i++) {
-    let kickNotes = "";
-    let hihatNotes = "";
-    let snareNotes = "";
-    let phraseName = "";
-    let arpNotes = "";
-    let keyBind = "";
-
-    if (i === 0) {
-      kickNotes = "5---:-13-:-5--:5---";
-      hihatNotes = "5-5-5555:5-5-5-23:13575-55:135-5-5-";
-      snareNotes = "--5-:-5--";
-      phraseName = "sweet";
-      keyBind = "KeyA";
-    }
-    if (i === 1) {
-      kickNotes = "5-5-:5-5-";
-      hihatNotes = "-5-5:-5-5";
-      snareNotes = "--5-:--5-";
-      phraseName = "damn";
-      keyBind = "KeyS";
-    }
-    if (i === 2) {
-      arpNotes = "5--5:--3-";
-      phraseName = "arpy";
-      keyBind = "KeyD";
+    for (const s of samples.value) {
+      samples.value.pop();
     }
 
-    if (kickNotes.length > 0) {
-      const kickM: Measure = {
-        index: 1,
-        vNotes: kickNotes,
-        m64Notes: initialize64Melody(kickNotes),
-        v64Notes: convertTo64Rhythm(kickNotes),
-      };
-      const hihatM: Measure = {
-        index: 1,
-        vNotes: hihatNotes,
-        m64Notes: initialize64Melody(hihatNotes),
-        v64Notes: convertTo64Rhythm(hihatNotes),
-      };
-      const snareM: Measure = {
-        index: 1,
-        vNotes: snareNotes,
-        m64Notes: initialize64Melody(snareNotes),
-        v64Notes: convertTo64Rhythm(snareNotes),
-      };
+    for (const f of figures.value) {
+      figures.value.pop();
+    }
 
-      let j = 0;
-      if (i > 0) {
-        j = 3;
+    samples.value.push(createSample(kick1, "kick1", audioContext.value));
+    samples.value.push(createSample(hihat1, "hihat1", audioContext.value));
+    samples.value.push(createSample(snare1, "snare1", audioContext.value));
+    samples.value.push(createSample(kick2, "kick2", audioContext.value));
+    samples.value.push(createSample(hihat2, "hihat2", audioContext.value));
+    samples.value.push(createSample(snare2, "kick2", audioContext.value));
+    samples.value.push(createSample(arp1, "arp1", audioContext.value));
+
+    for (let i = 0; i < 3; i++) {
+      let kickNotes = "";
+      let hihatNotes = "";
+      let snareNotes = "";
+      let phraseName = "";
+      let arpNotes = "";
+      let keyBind = "";
+
+      if (i === 0) {
+        kickNotes = "5---:-13-:-5--:5---";
+        hihatNotes = "5-5-5555:5-5-5-23:13575-55:135-5-5-";
+        snareNotes = "--5-:-5--";
+        phraseName = "sweet";
+        keyBind = "KeyA";
+      }
+      if (i === 1) {
+        kickNotes = "5-5-:5-5-";
+        hihatNotes = "-5-5:-5-5";
+        snareNotes = "--5-:--5-";
+        phraseName = "damn";
+        keyBind = "KeyS";
+      }
+      if (i === 2) {
+        arpNotes = "5--5:--3-";
+        phraseName = "arpy";
+        keyBind = "KeyD";
       }
 
-      const kickP = createPattern(samples.value[0 + j]!, [kickM], audioContext.value);
-      const hihatP = createPattern(samples.value[1 + j]!, [hihatM], audioContext.value);
-      const snareP = createPattern(samples.value[2 + j]!, [snareM], audioContext.value);
+      if (kickNotes.length > 0) {
+        const kickM: Measure = {
+          vNotes: kickNotes,
+          m64Notes: initialize64Melody(kickNotes),
+          v64Notes: convertTo64Rhythm(kickNotes),
+        };
+        const hihatM: Measure = {
+          vNotes: hihatNotes,
+          m64Notes: initialize64Melody(hihatNotes),
+          v64Notes: convertTo64Rhythm(hihatNotes),
+        };
+        const snareM: Measure = {
+          vNotes: snareNotes,
+          m64Notes: initialize64Melody(snareNotes),
+          v64Notes: convertTo64Rhythm(snareNotes),
+        };
 
-      figures.value.push(
-        createFigure(
-          phraseName,
-          keyBind,
-          1,
-          [kickP, hihatP, snareP],
+        let j = 0;
+        if (i > 0) {
+          j = 3;
+        }
+
+        const kickP = createPattern(
+          samples.value[0 + j]!,
+          [kickM],
           audioContext.value
-        )
-      );
-    } else {
-      const arpM: Measure = {
-        index: 1,
-        vNotes: arpNotes,
-        m64Notes: initialize64Melody(arpNotes),
-        v64Notes: convertTo64Rhythm(arpNotes),
-      };
+        );
+        const hihatP = createPattern(
+          samples.value[1 + j]!,
+          [hihatM],
+          audioContext.value
+        );
+        const snareP = createPattern(
+          samples.value[2 + j]!,
+          [snareM],
+          audioContext.value
+        );
 
-      const arpP = createPattern(samples.value[6]!, [arpM], audioContext.value);
+        figures.value.push(
+          createFigure(
+            phraseName,
+            keyBind,
+            1,
+            [kickP, hihatP, snareP],
+            audioContext.value
+          )
+        );
+      } else {
+        const arpM: Measure = {
+          vNotes: arpNotes,
+          m64Notes: initialize64Melody(arpNotes),
+          v64Notes: convertTo64Rhythm(arpNotes),
+        };
 
-      figures.value.push(createFigure(phraseName, keyBind, 1, [arpP], audioContext.value));
+        const arpP = createPattern(
+          samples.value[6]!,
+          [arpM],
+          audioContext.value
+        );
+
+        figures.value.push(
+          createFigure(phraseName, keyBind, 1, [arpP], audioContext.value)
+        );
+      }
     }
+    activeFigure.value = figures.value[0];
   }
-  activeFigure.value = figures.value[0];
-}
   async function playSample(s: Sample, velocity: number, melody: number) {
     if (!audioContext.value) return;
 
@@ -246,9 +261,11 @@ async function loadFigures() {
 
   async function playTracker() {
     if (isPlaying.value) return;
+    if (!tracker.value) return;
 
+    tracker.value.tracks.forEach(t => t.currentMeasureIdx = 0);
     cursor.value = -1;
-    currentMeasure.value = 0;
+    currentMeasureIdx.value = -1;
     isPlaying.value = true;
 
     await mixerConnectTracker();
@@ -256,17 +273,17 @@ async function loadFigures() {
     const advanceCursor = async () => {
       if (!tracker.value) return;
 
-      const maxMeasures = Math.max(
+      const maxMeasureIdx = Math.max(
         ...tracker.value.tracks.map((t) => {
-          if (t.figure) return t.figure.measureCount;
+          if (t.figure) return t.figure.patterns[0]!.measures.length;
           return 0;
         })
-      );
+      ) - 1;
 
       cursor.value++;
       if (cursor.value === 64) cursor.value = 0;
-      if (cursor.value === 0) currentMeasure.value++;
-      if (currentMeasure.value > maxMeasures) currentMeasure.value = 1;
+      if (cursor.value === 0) currentMeasureIdx.value++;
+      if (currentMeasureIdx.value > maxMeasureIdx) currentMeasureIdx.value = 0;
 
       let noteLength = (1 / (64 / 4)) * (60 / tracker.value.bpm) * 1000; // milliseconds
 
@@ -276,9 +293,7 @@ async function loadFigures() {
             if (p.mute) {
               stopSample(p.sample);
             } else {
-              const m = p.measures.find(
-                (_m) => _m.index === currentMeasure.value
-              );
+              const m = p.measures[currentMeasureIdx.value];
 
               if (m && m.v64Notes[cursor.value] !== "-") {
                 const velocity = Number(m.v64Notes[cursor.value]);
@@ -318,11 +333,12 @@ async function loadFigures() {
     activeFigure,
     isPlaying,
     cursor,
+    currentMeasureIdx,
     playSample,
     stopSample,
     playTracker,
     stopTracker,
     mixerConnectChildToParent,
-    loadFigures
+    loadFigures,
   };
 });
