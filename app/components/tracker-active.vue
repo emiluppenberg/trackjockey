@@ -78,7 +78,10 @@ async function changeActiveTrackFigure(e: KeyboardEvent) {
 }
 
 function toggleActiveTrackMix() {
-  audioStore.activeMixer = audioStore.activeTrack?.mixer;
+  if (!audioStore.activeTrack) return;
+
+  audioStore.activeMixer = audioStore.activeTrack.mixer;
+  audioStore.activeMixerName = `${tracks.indexOf(audioStore.activeTrack) + 1}: ${audioStore.activeTrack.figure?.name}`
 }
 
 onMounted(() => {

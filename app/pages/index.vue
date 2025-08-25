@@ -6,10 +6,10 @@ const audioStore = useAudioStore();
   <div class="flex flex-col w-screen h-auto overflow-y-scroll">
     <button @click="audioStore.loadFigures">Load</button>
     <Tracker class="mx-[30px] my-[50px]"></Tracker>
-    <!-- <Mixer
+    <Mixer
       v-if="audioStore.audioContext && audioStore.tracker"
-      class="w-auto mx-[30px]"
-    ></Mixer> -->
+      class="mx-[30px]"
+    ></Mixer>
     <Figures class="mx-[30px] my-[50px]"></Figures>
     <Sampler v-if="audioStore.audioContext" class="mx-[30px]"></Sampler>
   </div>

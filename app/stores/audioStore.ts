@@ -21,6 +21,7 @@ export const useAudioStore = defineStore("audioStore", () => {
   const tracker = ref<Tracker>();
 
   const activeMixer = ref<Mixer>();
+  const activeMixerName = ref<string>("");
   const activeTrack = ref<Track>();
   const activeFigure = ref<Figure>();
 
@@ -192,9 +193,30 @@ export const useAudioStore = defineStore("audioStore", () => {
 
   async function mixerConnectChildToParent(cMixer: Mixer, pMixer: Mixer) {
     let lastNode: AudioNode = cMixer.pannerNode; // Default audio flow : pannerNode -> pitcherNode? -> ... -> gainNode -> parent
-    lastNode.disconnect(0);
-    if (cMixer.pitcherNode) lastNode = lastNode.connect(cMixer.pitcherNode, 0);
-    lastNode.connect(cMixer.gainNode, 0).connect(pMixer.pannerNode, 0);
+    lastNode = lastNode
+      .connect(cMixer.pitcherNode, 0)
+      .connect(cMixer.gainNode, 0);
+
+    if (cMixer.eq.filterNodes.length > 0) {
+      lastNode.disconnect(0);
+      lastNode = lastNode.connect(cMixer.eq.filterNodes[0]!, 0);
+
+      for (const f of cMixer.eq.filterNodes) {
+        const idx = cMixer.eq.filterNodes.indexOf(f);
+
+        f.frequency.value = cMixer.eq.filterFreqs[idx]!;
+        f.gain.value = cMixer.eq.filterGains[idx]!;
+        f.detune.value = cMixer.eq.filterDetunes[idx]!;
+        f.Q.value = cMixer.eq.filterQs[idx]!;
+
+        if (cMixer.eq.filterNodes[idx + 1]) {
+          lastNode.disconnect(0);
+          lastNode = lastNode.connect(cMixer.eq.filterNodes[idx + 1]!, 0);
+        }
+      }
+    }
+
+    lastNode = lastNode.connect(pMixer.pannerNode, 0);
   }
 
   async function mixerConnectTrack(t: Track) {
@@ -231,7 +253,18 @@ export const useAudioStore = defineStore("audioStore", () => {
         if (t.figure && t.figure.patterns[0]) {
           const trackMeasuresLength = t.figure.patterns[0].measures.length;
 
-          if (cursor.value === 0) t.currentMeasureIdx++;
+          if (cursor.value === 0) {
+            switch (t.nextMeasureIdx) {
+              case undefined:
+                t.currentMeasureIdx++;
+                break;
+              default:
+                t.currentMeasureIdx = t.nextMeasureIdx;
+                t.nextMeasureIdx = undefined;
+                break;
+            }
+          }
+
           if (t.currentMeasureIdx < 0) t.currentMeasureIdx = 0; // When changing active track figure
           if (t.currentMeasureIdx >= trackMeasuresLength)
             t.currentMeasureIdx = 0;
@@ -266,6 +299,7 @@ export const useAudioStore = defineStore("audioStore", () => {
       await advanceCursor();
     }
   }
+
   async function stopTracker() {
     isPlaying.value = false;
     cursor.value = 0;
@@ -277,6 +311,7 @@ export const useAudioStore = defineStore("audioStore", () => {
     samples,
     tracker,
     activeMixer,
+    activeMixerName,
     activeTrack,
     activeFigure,
     isPlaying,

@@ -38,29 +38,33 @@ export type Tracker = {
 export type Track = {
   figure?: Figure;
   currentMeasureIdx: number;
+  nextMeasureIdx?: number;
   mixer: Mixer;
 };
 
 export type Mixer = {
-  pitcherNode?: AudioWorkletNode;
+  pitcherNode: AudioWorkletNode;
   pitchValue: number;
   pannerNode: StereoPannerNode;
   panValue: number;
   gainNode: GainNode;
+  eq: Equalizer;
 };
 
-export function isFigure(sound: Figure | Sample): sound is Figure {
-  return (sound as Figure).measureCount !== undefined;
+export type Equalizer = {
+  filterNodes: BiquadFilterNode[];
+  filterFreqs: number[];
+  filterDetunes: number[];
+  filterQs: number[];
+  filterGains: number[];
 }
-export function isSample(sound: Sample | Figure): sound is Sample {
-  return (sound as Sample).audioBuffer !== undefined;
-}
-export async function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-export function selectAllText(e: Event) {
-  const target = e.target as HTMLInputElement;
-  target.select();
+
+export function equalizerAddFilter(audioContext: AudioContext, eq: Equalizer){
+  eq.filterNodes.push(audioContext.createBiquadFilter());
+  eq.filterFreqs.push(0);
+  eq.filterDetunes.push(0);
+  eq.filterQs.push(0);
+  eq.filterGains.push(0);
 }
 
 export function createMixer(audioContext: AudioContext): Mixer {
@@ -69,7 +73,17 @@ export function createMixer(audioContext: AudioContext): Mixer {
     panValue: 0,
     pannerNode: audioContext.createStereoPanner(),
     pitchValue: 0,
-    pitcherNode: undefined,
+    pitcherNode: new AudioWorkletNode(
+      audioContext,
+      "pitch-processor"
+    ),
+    eq: {
+      filterNodes: [audioContext.createBiquadFilter()],
+      filterFreqs: [24000],
+      filterDetunes: [0],
+      filterQs: [0],
+      filterGains: [0]
+    }
   };
 }
 
@@ -99,6 +113,7 @@ export function createMeasure(vNotes: string): Measure {
     m64Notes: initialize64Melody(vNotes),
   };
 }
+
 export function createPattern(
   sample: Sample,
   measures: Measure[],
@@ -307,6 +322,15 @@ export function getCursorForVNotes(
     return true;
 
   return false;
+}
+
+export async function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export function selectAllText(e: Event) {
+  const target = e.target as HTMLInputElement;
+  target.select();
 }
 // Ignore below
 

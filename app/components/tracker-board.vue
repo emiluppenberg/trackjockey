@@ -1,35 +1,25 @@
 <script setup lang="ts">
-import { isFigure, isSample, type Figure, type Sample } from '~/types2';
+import { type Figure, type Sample } from "~/types2";
 
 const audioStore = useAudioStore();
 const figures = audioStore.figures;
 
-function changeSoundKeyBind(e: KeyboardEvent, sound: Figure | Sample) {
+function changeSoundKeyBind(e: KeyboardEvent, f: Figure) {
   if (e.code === "Slash" || e.code === "Period" || e.code === "Tab") {
     return;
   }
 
   e.preventDefault();
 
-  if (isFigure(sound)) {
-    sound.keyBind = e.code;
-  }
-  if (isSample(sound)) {
-    sound.keyBind = e.code;
-  }
+  f.keyBind = e.code;
 }
 </script>
 
 <template>
-    <!-- Tracker board -->
-  <div
-    id="tracker-board"
-    class="flex border-b"
-  >
+  <!-- Tracker board -->
+  <div id="tracker-board" class="flex border-b">
     <!-- Figures -->
-    <div
-      class="w-full h-full flex flex-wrap content-start mb-1"
-    >
+    <div class="w-full h-full flex flex-wrap content-start mb-1">
       <!-- Empty button -->
       <button
         tabindex="0"

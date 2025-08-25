@@ -3,6 +3,19 @@ import { getCursorForVNotes, getMelodyIndex } from "~/types2";
 
 const audioStore = useAudioStore();
 const viewMode = ref<boolean>(false);
+
+async function changeActiveTrackCurrentMeasure(idxM: number) {
+  if (!audioStore.activeTrack) return;
+
+  audioStore.activeTrack.currentMeasureIdx = idxM;
+}
+
+async function changeActiveTrackNextMeasure(e: MouseEvent, idxM: number) {
+  e.preventDefault();
+  if (!audioStore.activeTrack) return;
+
+  audioStore.activeTrack.nextMeasureIdx = idxM;
+}
 </script>
 
 <template>
@@ -50,6 +63,8 @@ const viewMode = ref<boolean>(false);
             v-for="(m, idxM) in p.measures"
             :id="`tracker-active-pattern-${idxP}-measure-${idxM}`"
             class="flex min-w-[400px] max-w-[400px] border-b border-r border-cyan-400 justify-between items-center text-2xl"
+            @click="changeActiveTrackCurrentMeasure(idxM)"
+            @click.right="(e) => changeActiveTrackNextMeasure(e, idxM)"
           >
             <!-- Velocity -->
             <div

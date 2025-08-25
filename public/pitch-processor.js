@@ -25,18 +25,24 @@ class PitchProcessor extends AudioWorkletProcessor {
 
   process(inputs, outputs, parameters) {
     if (!inputs[0] || inputs[0].length < 1) return true; // Keep processor alive when not in use
-
     const pitch = parameters.pitch[parameters.pitch.length - 1];
-    const playbackRate = Math.pow(2, pitch / 12);
 
-    // Initialize buffers for each channel (first time only)
-    if (this.buffers.length !== inputs[0].length) {
-      this.buffers = inputs[0].map(() => new Float32Array(this.bufferSize));
-      this.writePos = inputs[0].map(() => 0);
+    if (pitch === 0) {
+      for (let ch = 0; ch < inputs[0].length; ch++) {
+        outputs[0][ch].set(inputs[0][ch]);
+      }
+
+    } else {
+      // Initialize buffers for each channel (first time only)
+      if (this.buffers.length !== inputs[0].length) {
+        this.buffers = inputs[0].map(() => new Float32Array(this.bufferSize));
+        this.writePos = inputs[0].map(() => 0);
+      }
+      
+      const playbackRate = Math.pow(2, pitch / 12);
+      this.appendCurrentSamplesBlockIntoBuffer(inputs);
+      this.produceOutput(outputs, playbackRate);
     }
-
-    this.appendCurrentSamplesBlockIntoBuffer(inputs);
-    this.produceOutput(outputs, playbackRate);
 
     return true;
   }
