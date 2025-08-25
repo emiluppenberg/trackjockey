@@ -7,6 +7,7 @@ export type Measure = {
 export type Sample = {
   audioBuffer: AudioBuffer;
   source?: AudioBufferSourceNode;
+  fileName?: string;
   name: string;
   keyBind?: string;
   velocityNode: GainNode;
@@ -63,7 +64,7 @@ export function selectAllText(e: Event) {
 }
 
 export function createMixer(audioContext: AudioContext): Mixer {
-  return  {
+  return {
     gainNode: audioContext.createGain(),
     panValue: 0,
     pannerNode: audioContext.createStereoPanner(),
@@ -75,20 +76,29 @@ export function createMixer(audioContext: AudioContext): Mixer {
 export function createSample(
   audioBuffer: AudioBuffer,
   name: string,
-  audioContext: AudioContext
+  audioContext: AudioContext,
+  fileName?: string
 ): Sample {
   const sample = {
     audioBuffer: audioBuffer,
     name: name,
+    fileName: fileName,
     velocityNode: audioContext.createGain(),
     mixer: createMixer(audioContext),
   };
 
   sample.velocityNode.connect(sample.mixer.pannerNode);
-  
+
   return sample;
 }
 
+export function createMeasure(vNotes: string): Measure {
+  return {
+    vNotes: vNotes,
+    v64Notes: convertTo64Velocity(vNotes),
+    m64Notes: initialize64Melody(vNotes),
+  };
+}
 export function createPattern(
   sample: Sample,
   measures: Measure[],
@@ -118,7 +128,7 @@ export function createFigure(
   };
 }
 
-export function convertTo64Rhythm(vNotes: string): string {
+export function convertTo64Velocity(vNotes: string): string {
   const fLen = 64 / vNotes.length;
   let v64Notes = "";
   let fIdx = 0;
@@ -261,8 +271,14 @@ export function getMelodyIndex(idxC: number, vNotes: string): number {
   return fLen * idxM;
 }
 
-export function getCursorForVNotes(m: Measure, idxC: number, idxM: number): boolean {
-  const audioStore = useAudioStore()
+export function getCursorForVNotes(
+  m: Measure,
+  idxC: number,
+  idxM: number
+): boolean {
+  const audioStore = useAudioStore();
+  if (!audioStore.activeTrack) return false;
+
   let colonIndices: number[] = [];
   let currentNoteIdx: number = idxC;
 
@@ -280,7 +296,7 @@ export function getCursorForVNotes(m: Measure, idxC: number, idxM: number): bool
   const fLen = 64 / vNotesClean.length;
   const nextNoteIdx = currentNoteIdx + 1;
 
-  if (audioStore.currentMeasureIdx !== idxM) return false;
+  if (audioStore.activeTrack.currentMeasureIdx !== idxM) return false;
 
   if (audioStore.cursor === currentNoteIdx * fLen) return true;
 

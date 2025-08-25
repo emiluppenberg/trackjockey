@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {
   type Measure,
-  convertTo64Rhythm,
+  convertTo64Velocity,
   getMelodyIndex,
   initialize64Melody,
 } from "~/types2";
@@ -71,7 +71,7 @@ function inputMeasureNotation(e: Event, m: Measure) {
     }
   }
   m.vNotes = vNotes;
-  m.v64Notes = convertTo64Rhythm(vNotes);
+  m.v64Notes = convertTo64Velocity(vNotes);
   m.m64Notes = initialize64Melody(vNotes);
 }
 </script>

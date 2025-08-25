@@ -25,7 +25,7 @@ const viewMode = ref<boolean>(false);
       >
         <button
           v-for="(p, idxP) in audioStore.activeTrack?.figure.patterns"
-          class="h-[40px] text-center overflow-x-hidden border-b border-white"
+          class="h-[40px] text-center overflow-x-hidden overflow-y-hidden border-b border-white"
           :class="{ 'bg-green-600': !p.mute, 'bg-red-600': p.mute }"
           @click="
             () => {
@@ -57,7 +57,7 @@ const viewMode = ref<boolean>(false);
               class="text-center w-[2em]"
               :class="{
                 'text-emerald-600': getCursorForVNotes(m, idxC, idxM),
-                hidden: !viewMode,
+                hidden: viewMode,
               }"
             >
               {{ c }}
@@ -68,7 +68,7 @@ const viewMode = ref<boolean>(false);
               class="text-center w-[2em]"
               :class="{
                 'text-emerald-600': getCursorForVNotes(m, idxC, idxM),
-                hidden: viewMode,
+                hidden: !viewMode,
               }"
             >
               <!-- Value -->

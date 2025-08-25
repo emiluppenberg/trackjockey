@@ -10,7 +10,7 @@ function handleActiveInputKeyDown(e: KeyboardEvent) {
   const key = e.key;
   const element = e.target as HTMLButtonElement;
   element.style.color = "white";
-  
+
   if (key === "Tab") return;
   e.preventDefault();
 
@@ -58,19 +58,23 @@ function focusActiveInput(e: KeyboardEvent) {
   if (element) element.focus();
 }
 
-function changeActiveTrackFigure(e: KeyboardEvent) {
+async function changeActiveTrackFigure(e: KeyboardEvent) {
   if (e.code === "Tab") return;
+  if (!audioStore.activeTrack) return;
 
   e.preventDefault();
 
   if (e.code === "KeyQ") {
-    audioStore.activeTrack!.figure = undefined;
+    audioStore.activeTrack.figure = undefined;
     return;
   }
 
   const f = figures.find((_f) => _f.keyBind === e.code);
 
-  if (f) audioStore.activeTrack!.figure = f;
+  if (f) {
+    audioStore.activeTrack.figure = f;
+    await audioStore.mixerConnectTrack(audioStore.activeTrack);
+  }
 }
 
 function toggleActiveTrackMix() {
@@ -90,7 +94,7 @@ onMounted(() => {
   <div id="tracker-active" class="flex h-[40px] border-t border-b border-white">
     <button
       id="active-input"
-    class="w-[950px] border-r border-white text-white text-center text-3xl bg-indigo-700 focus:bg-indigo-400 select-text"
+      class="w-[950px] border-r border-white text-white text-center text-3xl bg-indigo-700 focus:bg-indigo-400 select-text"
       @keydown="(e) => handleActiveInputKeyDown(e)"
     >
       {{ tracks.indexOf(audioStore.activeTrack!) + 1 }}

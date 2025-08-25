@@ -13,7 +13,9 @@ async function addSample() {
     const audioBuffer = await audioContext.decodeAudioData(
       await newFile.arrayBuffer()
     );
-    samples.push(createSample(audioBuffer, newFile.name, audioContext));
+    samples.push(
+      createSample(audioBuffer, newFile.name, audioContext, newFile.name)
+    );
   }
 }
 async function changeSample(idxS: number) {
@@ -26,8 +28,10 @@ async function changeSample(idxS: number) {
       await newFile.arrayBuffer()
     );
 
-    if (audioStore.samples[idxS])
+    if (audioStore.samples[idxS]) {
       audioStore.samples[idxS].audioBuffer = audioBuffer;
+      audioStore.samples[idxS].fileName = newFile.name;
+    }
   }
 }
 </script>
@@ -65,7 +69,7 @@ async function changeSample(idxS: number) {
           <div
             class="w-full h-full border-b border-r border-black text-center select-none overflow-hidden grid place-items-center bg-blue-600 peer-focus:ring-2 peer-focus:ring-blue-600"
           >
-            <span class="text-center text-4xl">FILE</span>
+            <span class="text-center text-4xl">{{ s.fileName || "FILE" }}</span>
           </div>
         </div>
       </div>

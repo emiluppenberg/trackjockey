@@ -8,10 +8,10 @@ import {
   type Tracker,
   createMixer,
   type Track,
-  initialize64Melody,
-  convertTo64Rhythm,
-  type Measure,
   createPattern,
+  createMeasure,
+  type Pattern,
+  type Measure,
 } from "~/types2";
 
 export const useAudioStore = defineStore("audioStore", () => {
@@ -38,7 +38,7 @@ export const useAudioStore = defineStore("audioStore", () => {
         {
           figure: undefined,
           mixer: createMixer(audioContext.value),
-          currentMeasureIdx: 0
+          currentMeasureIdx: -1,
         },
       ],
       mixer: createMixer(audioContext.value),
@@ -46,52 +46,15 @@ export const useAudioStore = defineStore("audioStore", () => {
 
     activeMixer.value = tracker.value.tracks[0]!.mixer;
     activeTrack.value = tracker.value.tracks[0]!;
+
+    tracker.value.mixer.pannerNode
+      .connect(tracker.value.mixer.gainNode)
+      // .connect(tracker.value.mixer.pitcherNode)
+      .connect(audioContext.value.destination);
   });
 
   async function loadFigures() {
     if (!audioContext.value) return;
-
-    const hihat1 = await fetch(
-      new URL("~/assets/HH_AcardeBullet11.wav/", import.meta.url).href
-    )
-      .then((response) => response.arrayBuffer())
-      .then((arrayBuffer) => audioContext.value!.decodeAudioData(arrayBuffer));
-
-    const hihat2 = await fetch(
-      new URL("~/assets/HH_AcardeBullet41.wav/", import.meta.url).href
-    )
-      .then((response) => response.arrayBuffer())
-      .then((arrayBuffer) => audioContext.value!.decodeAudioData(arrayBuffer)!);
-
-    const kick1 = await fetch(
-      new URL("~/assets/Tom_BleepBullet3.wav/", import.meta.url).href
-    )
-      .then((response) => response.arrayBuffer())
-      .then((arrayBuffer) => audioContext.value!.decodeAudioData(arrayBuffer)!);
-
-    const kick2 = await fetch(
-      new URL("~/assets/BD_KastleBullet1.wav/", import.meta.url).href
-    )
-      .then((response) => response.arrayBuffer())
-      .then((arrayBuffer) => audioContext.value!.decodeAudioData(arrayBuffer)!);
-
-    const snare1 = await fetch(
-      new URL("~/assets/SD_KastleBullet6.wav/", import.meta.url).href
-    )
-      .then((response) => response.arrayBuffer())
-      .then((arrayBuffer) => audioContext.value!.decodeAudioData(arrayBuffer)!);
-
-    const snare2 = await fetch(
-      new URL("~/assets/SD_LunchBullet4.wav/", import.meta.url).href
-    )
-      .then((response) => response.arrayBuffer())
-      .then((arrayBuffer) => audioContext.value!.decodeAudioData(arrayBuffer)!);
-
-    const arp1 = await fetch(
-      new URL("~/assets/ArpFallST_AcardeBullet002.wav/", import.meta.url).href
-    )
-      .then((response) => response.arrayBuffer())
-      .then((arrayBuffer) => audioContext.value!.decodeAudioData(arrayBuffer)!);
 
     for (const s of samples.value) {
       samples.value.pop();
@@ -101,107 +64,107 @@ export const useAudioStore = defineStore("audioStore", () => {
       figures.value.pop();
     }
 
-    samples.value.push(createSample(kick1, "kick1", audioContext.value));
-    samples.value.push(createSample(hihat1, "hihat1", audioContext.value));
-    samples.value.push(createSample(snare1, "snare1", audioContext.value));
-    samples.value.push(createSample(kick2, "kick2", audioContext.value));
-    samples.value.push(createSample(hihat2, "hihat2", audioContext.value));
-    samples.value.push(createSample(snare2, "kick2", audioContext.value));
-    samples.value.push(createSample(arp1, "arp1", audioContext.value));
+    const paths = import.meta.glob<string>("~/assets/*.wav", {
+      eager: true,
+      import: "default",
+    });
+    const wavs: string[] = Object.values(paths);
 
-    for (let i = 0; i < 3; i++) {
-      let kickNotes = "";
-      let hihatNotes = "";
-      let snareNotes = "";
-      let phraseName = "";
-      let arpNotes = "";
-      let keyBind = "";
+    for (let i = 0; i < wavs.length; i++) {
+      const sample = await fetch(wavs[i]!)
+        .then((response) => response.arrayBuffer())
+        .then(
+          (arrayBuffer) => audioContext.value!.decodeAudioData(arrayBuffer)!
+        );
 
-      if (i === 0) {
-        kickNotes = "5---:-13-:-5--:5---";
-        hihatNotes = "5-5-5555:5-5-5-23:13575-55:135-5-5-";
-        snareNotes = "--5-:-5--";
-        phraseName = "sweet";
-        keyBind = "KeyA";
+      const fileName = wavs[i]!.split("/").pop();
+
+      samples.value.push(
+        createSample(sample, fileName!, audioContext.value, fileName)
+      );
+    }
+
+    const kick1M = createMeasure("5-5-:5-5-");
+    const hihat1M = createMeasure("-5-5:-5-5");
+    const snare1M = createMeasure("--5-:--5-");
+    const kick2M = createMeasure("5---:5--2:-25-:--5-");
+    const hihat2M = createMeasure("5-5-5-5-:5---5-23:1-5-5-5-:1-5-5-5-");
+    const snare2M = createMeasure("----:5---:-2--:5---");
+    const perc2M = createMeasure("---5:---5");
+    const shi3M1 = createMeasure("2");
+    const shi3M2 = createMeasure("");
+
+    const patternsRecord: Record<string, Pattern[]> = {
+      "1": [],
+      "2": [],
+      "3": [],
+    };
+
+    for (const s of samples.value) {
+      if (s.fileName?.includes("kick1.wav")) {
+        patternsRecord["1"]!.push(
+          createPattern(s, [kick1M], audioContext.value)
+        );
       }
-      if (i === 1) {
-        kickNotes = "5-5-:5-5-";
-        hihatNotes = "-5-5:-5-5";
-        snareNotes = "--5-:--5-";
-        phraseName = "damn";
-        keyBind = "KeyS";
+      if (s.fileName?.includes("hihat1.wav")) {
+        patternsRecord["1"]!.push(
+          createPattern(s, [hihat1M], audioContext.value)
+        );
       }
-      if (i === 2) {
-        arpNotes = "5--5:--3-";
-        phraseName = "arpy";
-        keyBind = "KeyD";
+      if (s.fileName?.includes("snare1.wav")) {
+        patternsRecord["1"]!.push(
+          createPattern(s, [snare1M], audioContext.value)
+        );
       }
-
-      if (kickNotes.length > 0) {
-        const kickM: Measure = {
-          vNotes: kickNotes,
-          m64Notes: initialize64Melody(kickNotes),
-          v64Notes: convertTo64Rhythm(kickNotes),
-        };
-        const hihatM: Measure = {
-          vNotes: hihatNotes,
-          m64Notes: initialize64Melody(hihatNotes),
-          v64Notes: convertTo64Rhythm(hihatNotes),
-        };
-        const snareM: Measure = {
-          vNotes: snareNotes,
-          m64Notes: initialize64Melody(snareNotes),
-          v64Notes: convertTo64Rhythm(snareNotes),
-        };
-
-        let j = 0;
-        if (i > 0) {
-          j = 3;
-        }
-
-        const kickP = createPattern(
-          samples.value[0 + j]!,
-          [kickM],
-          audioContext.value
+      if (s.fileName?.includes("kick2.wav")) {
+        patternsRecord["2"]!.push(
+          createPattern(s, [kick2M], audioContext.value)
         );
-        const hihatP = createPattern(
-          samples.value[1 + j]!,
-          [hihatM],
-          audioContext.value
+      }
+      if (s.fileName?.includes("hihat2.wav")) {
+        patternsRecord["2"]!.push(
+          createPattern(s, [hihat2M], audioContext.value)
         );
-        const snareP = createPattern(
-          samples.value[2 + j]!,
-          [snareM],
-          audioContext.value
+      }
+      if (s.fileName?.includes("snare2.wav")) {
+        patternsRecord["2"]!.push(
+          createPattern(s, [snare2M], audioContext.value)
         );
-
-        figures.value.push(
-          createFigure(
-            phraseName,
-            keyBind,
-            1,
-            [kickP, hihatP, snareP],
-            audioContext.value
-          )
+      }
+      if (s.fileName?.includes("perc2.wav")) {
+        patternsRecord["2"]!.push(
+          createPattern(s, [perc2M], audioContext.value)
         );
-      } else {
-        const arpM: Measure = {
-          vNotes: arpNotes,
-          m64Notes: initialize64Melody(arpNotes),
-          v64Notes: convertTo64Rhythm(arpNotes),
-        };
-
-        const arpP = createPattern(
-          samples.value[6]!,
-          [arpM],
-          audioContext.value
-        );
-
-        figures.value.push(
-          createFigure(phraseName, keyBind, 1, [arpP], audioContext.value)
+      }
+      if (s.fileName?.includes("shi3.wav")) {
+        patternsRecord["3"]!.push(
+          createPattern(s, [shi3M1, shi3M2], audioContext.value)
         );
       }
     }
+
+    figures.value.push(
+      createFigure(
+        "drums1",
+        "KeyA",
+        1,
+        patternsRecord["1"]!,
+        audioContext.value
+      )
+    );
+    figures.value.push(
+      createFigure(
+        "drums2",
+        "KeyS",
+        1,
+        patternsRecord["2"]!,
+        audioContext.value
+      )
+    );
+    figures.value.push(
+      createFigure("shi1", "KeyD", 1, patternsRecord["3"]!, audioContext.value)
+    );
+
     activeFigure.value = figures.value[0];
   }
   async function playSample(s: Sample, velocity: number, melody: number) {
@@ -230,70 +193,54 @@ export const useAudioStore = defineStore("audioStore", () => {
   async function mixerConnectChildToParent(cMixer: Mixer, pMixer: Mixer) {
     let lastNode: AudioNode = cMixer.pannerNode; // Default audio flow : pannerNode -> pitcherNode? -> ... -> gainNode -> parent
     lastNode.disconnect(0);
-    if (cMixer.pitcherNode) lastNode = lastNode.connect(cMixer.pitcherNode);
-    lastNode.connect(cMixer.gainNode).connect(pMixer.pannerNode);
+    if (cMixer.pitcherNode) lastNode = lastNode.connect(cMixer.pitcherNode, 0);
+    lastNode.connect(cMixer.gainNode, 0).connect(pMixer.pannerNode, 0);
   }
 
-  async function mixerConnectTracker() {
+  async function mixerConnectTrack(t: Track) {
     if (!audioContext.value) return;
     if (!tracker.value) return;
+    if (!t.figure) return;
 
-    tracker.value.mixer.pannerNode
-      .connect(tracker.value.mixer.gainNode)
-      // .connect(tracker.value.mixer.pitcherNode)
-      .connect(audioContext.value.destination);
-
-    for (const t of tracker.value.tracks) {
-      mixerConnectChildToParent(t.mixer, tracker.value.mixer);
-
-      if (t.figure) {
-        mixerConnectChildToParent(t.figure.mixer, t.mixer);
-
-        for (const p of t.figure.patterns) {
-          mixerConnectChildToParent(p.mixer, t.figure.mixer);
-          mixerConnectChildToParent(p.sample.mixer, p.mixer);
-        }
-      }
+    mixerConnectChildToParent(t.mixer, tracker.value.mixer);
+    mixerConnectChildToParent(t.figure.mixer, t.mixer);
+    for (const p of t.figure.patterns) {
+      mixerConnectChildToParent(p.mixer, t.figure.mixer);
+      mixerConnectChildToParent(p.sample.mixer, p.mixer);
     }
   }
-
-  async function advanceCursor() {}
 
   async function playTracker() {
     if (isPlaying.value) return;
     if (!tracker.value) return;
 
-    tracker.value.tracks.forEach(t => t.currentMeasureIdx = 0);
+    tracker.value.tracks.forEach((t) => (t.currentMeasureIdx = -1));
     cursor.value = -1;
     currentMeasureIdx.value = -1;
     isPlaying.value = true;
 
-    await mixerConnectTracker();
-
     const advanceCursor = async () => {
       if (!tracker.value) return;
 
-      const maxMeasureIdx = Math.max(
-        ...tracker.value.tracks.map((t) => {
-          if (t.figure) return t.figure.patterns[0]!.measures.length;
-          return 0;
-        })
-      ) - 1;
-
       cursor.value++;
       if (cursor.value === 64) cursor.value = 0;
-      if (cursor.value === 0) currentMeasureIdx.value++;
-      if (currentMeasureIdx.value > maxMeasureIdx) currentMeasureIdx.value = 0;
 
       let noteLength = (1 / (64 / 4)) * (60 / tracker.value.bpm) * 1000; // milliseconds
 
       for (const t of tracker.value.tracks) {
-        if (t.figure) {
+        if (t.figure && t.figure.patterns[0]) {
+          const trackMeasuresLength = t.figure.patterns[0].measures.length;
+
+          if (cursor.value === 0) t.currentMeasureIdx++;
+          if (t.currentMeasureIdx < 0) t.currentMeasureIdx = 0; // When changing active track figure
+          if (t.currentMeasureIdx >= trackMeasuresLength)
+            t.currentMeasureIdx = 0;
+
           for (const p of t.figure.patterns) {
             if (p.mute) {
               stopSample(p.sample);
             } else {
-              const m = p.measures[currentMeasureIdx.value];
+              const m = p.measures[t.currentMeasureIdx];
 
               if (m && m.v64Notes[cursor.value] !== "-") {
                 const velocity = Number(m.v64Notes[cursor.value]);
@@ -314,6 +261,7 @@ export const useAudioStore = defineStore("audioStore", () => {
       if (noteLength) await sleep(noteLength);
       if (!isPlaying.value) return;
     };
+
     while (isPlaying.value) {
       await advanceCursor();
     }
@@ -339,6 +287,7 @@ export const useAudioStore = defineStore("audioStore", () => {
     playTracker,
     stopTracker,
     mixerConnectChildToParent,
+    mixerConnectTrack,
     loadFigures,
   };
 });
