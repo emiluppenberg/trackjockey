@@ -42,9 +42,7 @@ onMounted(() => {
     <TrackerList
       v-if="audioStore.audioContext && audioStore.tracker"
     ></TrackerList>
-    <TrackerActive v-if="audioStore.audioContext && audioStore.tracker"></TrackerActive>
     <TrackerActiveFigure
-      v-if="audioStore.activeTrack"
       class="h-auto"
     ></TrackerActiveFigure>
   </div>

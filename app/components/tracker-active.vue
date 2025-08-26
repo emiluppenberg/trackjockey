@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { selectAllText, type Measure, type Track } from "~/types2";
+import { cloneFigure, selectAllText, type Measure, type Track } from "~/types2";
 const audioStore = useAudioStore();
 const audioContext = audioStore.audioContext!;
 const tracker = audioStore.tracker!;
@@ -72,7 +72,7 @@ async function changeActiveTrackFigure(e: KeyboardEvent) {
   const f = figures.find((_f) => _f.keyBind === e.code);
 
   if (f) {
-    audioStore.activeTrack.figure = f;
+    audioStore.activeTrack.figure = cloneFigure(f, audioContext);
     await audioStore.mixerConnectTrack(audioStore.activeTrack);
   }
 }

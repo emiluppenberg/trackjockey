@@ -2,16 +2,15 @@
 import { createFigure } from "~/types2";
 const audioStore = useAudioStore();
 const audioContext = audioStore.audioContext!;
-const figures = audioStore.figures;
 
 function addFigure() {
-  figures.push(createFigure("New figure", "", 1, [], audioContext));
-  audioStore.activeFigure = figures[figures.length - 1];
+  const fLen = audioStore.figures.push(createFigure("New figure", "", 1, [], audioContext));
+  audioStore.activeFigure = audioStore.figures[fLen - 1];
 }
 function removeFigure(idxF: number) {
-  for (let i = 0; i < figures.length; i++) {
+  for (let i = 0; i < audioStore.figures.length; i++) {
     if (i === idxF) {
-      figures.splice(idxF, 1);
+      audioStore.figures.splice(idxF, 1);
       return;
     }
   }
@@ -48,7 +47,7 @@ function handleFocusOutFigure(e: Event) {
       <!-- Figures list -->
       <div
         id="figures-item"
-        v-for="(f, idxF) in figures"
+        v-for="(f, idxF) in audioStore.figures"
         :key="idxF"
         class="min-w-[150px] flex flex-col border-r border-cyan-400 overflow-hidden"
         :class="{
@@ -74,7 +73,7 @@ function handleFocusOutFigure(e: Event) {
               'text-lime-200': f === audioStore.activeFigure,
             }"
           >
-            {{ (figures.indexOf(f) + 1).toString() }}
+            {{ (audioStore.figures.indexOf(f) + 1).toString() }}
           </label>
           <input
             disabled

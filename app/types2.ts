@@ -11,7 +11,6 @@ export type Sample = {
   name: string;
   keyBind?: string;
   velocityNode: GainNode;
-  mixer: Mixer;
 };
 
 export type Figure = {
@@ -19,71 +18,80 @@ export type Figure = {
   keyBind?: string;
   measureCount: number;
   patterns: Pattern[];
-  mixer: Mixer;
 };
 
 export type Pattern = {
   mute: boolean;
   sample: Sample;
   measures: Measure[];
-  mixer: Mixer;
 };
 
 export type Tracker = {
   bpm: number;
   tracks: Track[];
-  mixer: Mixer;
+  master: Mixer;
 };
 
 export type Track = {
   figure?: Figure;
+  nextFigure?: Figure;
   currentMeasureIdx: number;
-  nextMeasureIdx?: number;
+  nextMeasureIdxs: number[];
   mixer: Mixer;
 };
 
 export type Mixer = {
   pitcherNode: AudioWorkletNode;
-  pitchValue: number;
+  pitch: number;
   pannerNode: StereoPannerNode;
-  panValue: number;
   gainNode: GainNode;
-  eq: Equalizer;
+  filterNodes: BiquadFilterNode[];
+  compressorNode: DynamicsCompressorNode;
 };
 
-export type Equalizer = {
-  filterNodes: BiquadFilterNode[];
-  filterFreqs: number[];
-  filterDetunes: number[];
-  filterQs: number[];
-  filterGains: number[];
+export function cloneFigure(f: Figure, audioContext: AudioContext): Figure {
+  return {
+    ...f,
+    patterns: f.patterns.map(p => clonePattern(p, audioContext)),
+  };
 }
 
-export function equalizerAddFilter(audioContext: AudioContext, eq: Equalizer){
-  eq.filterNodes.push(audioContext.createBiquadFilter());
-  eq.filterFreqs.push(0);
-  eq.filterDetunes.push(0);
-  eq.filterQs.push(0);
-  eq.filterGains.push(0);
+export function clonePattern(p: Pattern, audioContext: AudioContext) {
+  return {
+    ...p,
+    sample: {
+      ...p.sample,
+      audioBuffer: cloneAudioBuffer(p.sample.audioBuffer, audioContext),
+      source: undefined,
+      velocityNode: audioContext.createGain(),
+    },
+  };
+}
+
+export function cloneAudioBuffer(
+  audioBuffer: AudioBuffer,
+  audioContext: AudioContext
+): AudioBuffer {
+  const clone = audioContext.createBuffer(
+    audioBuffer.numberOfChannels,
+    audioBuffer.length,
+    audioBuffer.sampleRate
+  );
+  for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
+    clone.copyToChannel(audioBuffer.getChannelData(i), i);
+  }
+
+  return clone;
 }
 
 export function createMixer(audioContext: AudioContext): Mixer {
   return {
     gainNode: audioContext.createGain(),
-    panValue: 0,
     pannerNode: audioContext.createStereoPanner(),
-    pitchValue: 0,
-    pitcherNode: new AudioWorkletNode(
-      audioContext,
-      "pitch-processor"
-    ),
-    eq: {
-      filterNodes: [audioContext.createBiquadFilter()],
-      filterFreqs: [24000],
-      filterDetunes: [0],
-      filterQs: [0],
-      filterGains: [0]
-    }
+    pitch: 0,
+    pitcherNode: new AudioWorkletNode(audioContext, "pitch-processor"),
+    filterNodes: [],
+    compressorNode: audioContext.createDynamicsCompressor(),
   };
 }
 
@@ -98,10 +106,7 @@ export function createSample(
     name: name,
     fileName: fileName,
     velocityNode: audioContext.createGain(),
-    mixer: createMixer(audioContext),
   };
-
-  sample.velocityNode.connect(sample.mixer.pannerNode);
 
   return sample;
 }
@@ -123,7 +128,6 @@ export function createPattern(
     mute: false,
     sample: sample,
     measures: measures,
-    mixer: createMixer(audioContext),
   };
 }
 
@@ -139,7 +143,6 @@ export function createFigure(
     keyBind: keyBind,
     measureCount: measureCount,
     patterns: patterns,
-    mixer: createMixer(audioContext),
   };
 }
 

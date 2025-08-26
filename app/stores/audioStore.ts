@@ -40,18 +40,23 @@ export const useAudioStore = defineStore("audioStore", () => {
           figure: undefined,
           mixer: createMixer(audioContext.value),
           currentMeasureIdx: -1,
+          nextMeasureIdxs: [],
         },
       ],
-      mixer: createMixer(audioContext.value),
+      master: createMixer(audioContext.value),
     };
 
     activeMixer.value = tracker.value.tracks[0]!.mixer;
     activeTrack.value = tracker.value.tracks[0]!;
 
-    tracker.value.mixer.pannerNode
-      .connect(tracker.value.mixer.gainNode)
+    tracker.value.master.pannerNode
+      .connect(tracker.value.master.gainNode)
       // .connect(tracker.value.mixer.pitcherNode)
       .connect(audioContext.value.destination);
+  });
+
+  watch(activeTrack, (newTrack) => {
+    if (newTrack) activeMixer.value = newTrack.mixer;
   });
 
   async function loadFigures() {
@@ -191,32 +196,28 @@ export const useAudioStore = defineStore("audioStore", () => {
     s.source = undefined;
   }
 
-  async function mixerConnectChildToParent(cMixer: Mixer, pMixer: Mixer) {
-    let lastNode: AudioNode = cMixer.pannerNode; // Default audio flow : pannerNode -> pitcherNode? -> ... -> gainNode -> parent
+  async function mixerConnect(mixer: Mixer) {
+    let lastNode: AudioNode = mixer.pannerNode; // Default audio flow : pannerNode -> pitcherNode? -> ... -> gainNode -> parent
     lastNode = lastNode
-      .connect(cMixer.pitcherNode, 0)
-      .connect(cMixer.gainNode, 0);
+      .connect(mixer.pitcherNode, 0)
+      .connect(mixer.compressorNode, 0);
 
-    if (cMixer.eq.filterNodes.length > 0) {
+    if (mixer.filterNodes.length > 0) {
       lastNode.disconnect(0);
-      lastNode = lastNode.connect(cMixer.eq.filterNodes[0]!, 0);
+      lastNode = lastNode.connect(mixer.filterNodes[0]!, 0);
 
-      for (const f of cMixer.eq.filterNodes) {
-        const idx = cMixer.eq.filterNodes.indexOf(f);
+      for (const f of mixer.filterNodes) {
+        const idx = mixer.filterNodes.indexOf(f);
 
-        f.frequency.value = cMixer.eq.filterFreqs[idx]!;
-        f.gain.value = cMixer.eq.filterGains[idx]!;
-        f.detune.value = cMixer.eq.filterDetunes[idx]!;
-        f.Q.value = cMixer.eq.filterQs[idx]!;
-
-        if (cMixer.eq.filterNodes[idx + 1]) {
+        if (mixer.filterNodes[idx + 1]) {
           lastNode.disconnect(0);
-          lastNode = lastNode.connect(cMixer.eq.filterNodes[idx + 1]!, 0);
+          lastNode = lastNode.connect(mixer.filterNodes[idx + 1]!, 0);
         }
       }
     }
 
-    lastNode = lastNode.connect(pMixer.pannerNode, 0);
+    lastNode.disconnect(0);
+    lastNode = lastNode.connect(mixer.gainNode, 0);
   }
 
   async function mixerConnectTrack(t: Track) {
@@ -224,11 +225,13 @@ export const useAudioStore = defineStore("audioStore", () => {
     if (!tracker.value) return;
     if (!t.figure) return;
 
-    mixerConnectChildToParent(t.mixer, tracker.value.mixer);
-    mixerConnectChildToParent(t.figure.mixer, t.mixer);
+    mixerConnect(t.mixer);
+    t.mixer.gainNode.disconnect(0);
+    t.mixer.gainNode.connect(tracker.value.master.pannerNode, 0);
+
     for (const p of t.figure.patterns) {
-      mixerConnectChildToParent(p.mixer, t.figure.mixer);
-      mixerConnectChildToParent(p.sample.mixer, p.mixer);
+      p.sample.velocityNode.disconnect(0);
+      p.sample.velocityNode.connect(t.mixer.pannerNode, 0);
     }
   }
 
@@ -254,14 +257,11 @@ export const useAudioStore = defineStore("audioStore", () => {
           const trackMeasuresLength = t.figure.patterns[0].measures.length;
 
           if (cursor.value === 0) {
-            switch (t.nextMeasureIdx) {
-              case undefined:
-                t.currentMeasureIdx++;
-                break;
-              default:
-                t.currentMeasureIdx = t.nextMeasureIdx;
-                t.nextMeasureIdx = undefined;
-                break;
+            if (t.nextMeasureIdxs.length > 0) {
+              t.currentMeasureIdx = t.nextMeasureIdxs[0]!;
+              t.nextMeasureIdxs.splice(0, 1);
+            } else {
+              t.currentMeasureIdx++;
             }
           }
 
@@ -321,7 +321,7 @@ export const useAudioStore = defineStore("audioStore", () => {
     stopSample,
     playTracker,
     stopTracker,
-    mixerConnectChildToParent,
+    mixerConnect,
     mixerConnectTrack,
     loadFigures,
   };
