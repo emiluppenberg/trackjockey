@@ -85,14 +85,14 @@ function inputMeasureNotation(e: Event, m: Measure) {
   >
     <div
       id="pattern"
-      v-for="(p, idxP) in audioStore.activeFigure.patterns"
+      v-for="(s, idxS) in audioStore.activeFigure.samples"
       class="w-auto h-[40px] flex items-center"
     >
       <!-- Pattern measures -->
       <div id="pattern-measures" class="w-full h-full flex justify-start">
         <div
           :id="`pattern-measure-${idxM}`"
-          v-for="(m, idxM) in p.measures"
+          v-for="(m, idxM) in audioStore.activeFigure.measures[idxS]"
           :key="idxM"
           class="min-w-[400px] max-w-[400px] h-full flex"
         >
@@ -102,7 +102,7 @@ function inputMeasureNotation(e: Event, m: Measure) {
             >
               <!-- Textarea/Hidden -->
               <textarea
-                :id="`pattern-${idxP}-measure-${idxM}-rhythm-textarea`"
+                :id="`pattern-${idxS}-measure-${idxM}-rhythm-textarea`"
                 type="text"
                 class="w-full field-sizing-content text-center text-xl content-center bg-black text-white"
                 rows="1"
@@ -120,7 +120,7 @@ function inputMeasureNotation(e: Event, m: Measure) {
                 <div
                   tabindex="0"
                   class="w-full h-full flex items-center justify-evenly text-2xl"
-                  @focus="handleEditMeasureRhythm(idxP, idxM, m)"
+                  @focus="handleEditMeasureRhythm(idxS, idxM, m)"
                 >
                   <div
                     v-for="(c, idxC) in m.vNotes"

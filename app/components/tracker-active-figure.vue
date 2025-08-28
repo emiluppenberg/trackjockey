@@ -42,16 +42,16 @@ function checkNextMeasureIdxs(idxM: number): boolean {
         class="flex flex-col w-[100px] border-r border-white"
       >
         <button
-          v-for="(p, idxP) in audioStore.activeTrack?.figure?.patterns"
+          v-for="(s, idxS) in audioStore.activeTrack?.figure?.samples"
           class="h-[40px] text-center overflow-x-hidden overflow-y-hidden border-b border-white"
-          :class="{ 'bg-green-600': !p.mute, 'bg-red-600': p.mute }"
+          :class="{ 'bg-green-600': !s.mute, 'bg-red-600': s.mute }"
           @click="
             () => {
-              p.mute = !p.mute;
+              s.mute = !s.mute;
             }
           "
         >
-          {{ p.sample.name }}
+          {{ s.name }}
         </button>
       </div>
       <!-- Patterns and measures -->
@@ -60,13 +60,13 @@ function checkNextMeasureIdxs(idxM: number): boolean {
         class="max-w-[1800px] min-h-[40px] flex flex-col bg-black overflow-x-auto"
       >
         <div
-          :id="`tracker-active-pattern-${idxP}`"
-          v-for="(p, idxP) in audioStore.activeTrack?.figure?.patterns"
+          :id="`tracker-active-pattern-${idxS}`"
+          v-for="(s, idxS) in audioStore.activeTrack?.figure?.samples"
           class="flex border-cyan-400 bg-black text-white h-[40px]"
         >
           <div
-            v-for="(m, idxM) in p.measures"
-            :id="`tracker-active-pattern-${idxP}-measure-${idxM}`"
+            v-for="(m, idxM) in audioStore.activeTrack?.figure?.measures[idxS]"
+            :id="`tracker-active-pattern-${idxS}-measure-${idxM}`"
             class="relative flex min-w-[400px] max-w-[400px] border-b border-r justify-between items-center text-2xl"
             :class="{
               'border-cyan-400': !checkNextMeasureIdxs(idxM),

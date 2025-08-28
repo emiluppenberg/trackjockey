@@ -1,45 +1,47 @@
 <script setup lang="ts">
-import { createPattern } from "~/types2";
+import type { Measure } from "~/types2";
 
 const audioStore = useAudioStore();
 
 const editMode = ref<boolean>(false);
 
-function addPattern() {
+function addSample() {
   if (!audioStore.activeFigure) return;
   if (!audioStore.audioContext) return;
+  if (!audioStore.tracker) return;
 
-  const measures = [];
+  const mLen = audioStore.activeFigure.measures[0]!.length;
+  let measures: Measure[] = [];
 
-  for (let i = 0; i < audioStore.activeFigure.measureCount; i++) {
+  for (let i = 0; i < mLen; i++) {
     measures.push({ vNotes: "", m64Notes: [], v64Notes: "" });
   }
 
-  audioStore.activeFigure.patterns.push(
-    createPattern(audioStore.samples[0]!, measures, audioStore.audioContext)
-  );
+  audioStore.activeFigure.samples.push(audioStore.samples[0]!);
+  audioStore.activeFigure.measures.push(measures);
+
+  audioStore.reloadActiveFigureTracks();
 }
-function removePattern(idxP: number) {
+function removeSample(idxS: number) {
   if (!audioStore.activeFigure) return;
 
-  audioStore.activeFigure.patterns.splice(idxP, 1);
+  audioStore.activeFigure.samples.splice(idxS, 1);
+  audioStore.activeFigure.measures.splice(idxS, 1);
+
+  audioStore.reloadActiveFigureTracks();
 }
 
 function addMeasure() {
   if (!audioStore.activeFigure) return;
 
-  audioStore.activeFigure.measureCount++;
-
-  audioStore.activeFigure.patterns.forEach((p) =>
-    p.measures.push({ vNotes: "", m64Notes: [], v64Notes: "" })
+  audioStore.activeFigure.measures.forEach((m) =>
+    m.push({ vNotes: "", m64Notes: [], v64Notes: "" })
   );
 }
 function removeMeasure() {
   if (!audioStore.activeFigure) return;
 
-  audioStore.activeFigure.measureCount--;
-
-  audioStore.activeFigure.patterns.forEach((p) => p.measures.pop());
+  audioStore.activeFigure.measures.forEach((m) => m.pop());
 }
 </script>
 
@@ -60,32 +62,32 @@ function removeMeasure() {
         <!-- Pattern sample -->
         <div class="flex flex-col w-[100px]">
           <div
-            :id="`pattern-${idxP}-sample`"
-            v-for="(p, idxP) in audioStore.activeFigure.patterns"
+            :id="`pattern-${idxS}-sample`"
+            v-for="(s, idxS) in audioStore.activeFigure.samples"
             class="flex w-full h-[40px] border-r border-b border-white"
           >
             <button
               class="w-[30px] h-full text-center bg-red-600 border-r"
-              @click="removePattern(idxP)"
+              @click="removeSample(idxS)"
             >
               -
             </button>
             <select
-              v-model="p.sample"
+              v-model="audioStore.activeFigure.samples[idxS]"
               class="w-[70px] h-full text-center bg-blue-600"
             >
               <option
-                v-for="(s, idxS) in audioStore.samples"
-                :key="idxS"
+                v-for="(_s, idx_s) in audioStore.samples"
+                :key="idx_s"
                 class="bg-blue-600"
-                :value="s"
+                :value="_s"
               >
-                {{ s.name }}
+                {{ _s.name }}
               </option>
             </select>
           </div>
         </div>
-        <FiguresPatternsEditor :edit-mode="editMode"></FiguresPatternsEditor>
+        <FiguresSamplesMeasures :edit-mode="editMode"></FiguresSamplesMeasures>
       </div>
       <!-- +/- Measure buttons -->
       <div class="flex flex-col max-w-[100px]">
@@ -106,7 +108,7 @@ function removeMeasure() {
     <!-- New pattern -->
     <button
       class="min-w-[100px] h-[40px] border-r bg-sky-400 focus:bg-sky-200"
-      @click="addPattern"
+      @click="addSample"
     >
       +
     </button>

@@ -33,7 +33,7 @@ function changeTracksLength(e: Event) {
           figure: undefined,
           mixer: createMixer(audioStore.audioContext!),
           currentMeasureIdx: -1,
-          nextMeasureIdxs: []
+          nextMeasureIdxs: [],
         });
       }
     }
@@ -118,7 +118,9 @@ function pushTracksNextFigure() {
         v-if="tracker.tracks.some((t) => t.nextFigure)"
         class="w-[100px] h-[40px] border-r border-t border-white text-center text-xl text-white bg-sky-400 focus:bg-sky-200"
         @click="pushTracksNextFigure"
-      >PUSH -></button>
+      >
+        PUSH ->
+      </button>
     </div>
     <!-- Track list -->
     <div id="tracker-list" class="flex w-full min-h-[80px] overflow-x-auto">

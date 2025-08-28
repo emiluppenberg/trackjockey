@@ -5,6 +5,7 @@ export type Measure = {
 };
 
 export type Sample = {
+  mute: boolean;
   audioBuffer: AudioBuffer;
   source?: AudioBufferSourceNode;
   fileName?: string;
@@ -14,16 +15,11 @@ export type Sample = {
 };
 
 export type Figure = {
+  id: number;
   name: string;
   keyBind?: string;
-  measureCount: number;
-  patterns: Pattern[];
-};
-
-export type Pattern = {
-  mute: boolean;
-  sample: Sample;
-  measures: Measure[];
+  measures: Measure[][]; // First dimension indicates associated sample (measures[i][j] belongs to samples[i])
+  samples: Sample[]
 };
 
 export type Tracker = {
@@ -52,21 +48,18 @@ export type Mixer = {
 export function cloneFigure(f: Figure, audioContext: AudioContext): Figure {
   return {
     ...f,
-    patterns: f.patterns.map(p => clonePattern(p, audioContext)),
+    samples: f.samples.map(s => cloneSample(s, audioContext)),
   };
 }
 
-export function clonePattern(p: Pattern, audioContext: AudioContext) {
+export function cloneSample(s: Sample, audioContext: AudioContext) {
   return {
-    ...p,
-    sample: {
-      ...p.sample,
-      audioBuffer: cloneAudioBuffer(p.sample.audioBuffer, audioContext),
+    ...s,
+      audioBuffer: cloneAudioBuffer(s.audioBuffer, audioContext),
       source: undefined,
       velocityNode: audioContext.createGain(),
-    },
-  };
-}
+    }
+  }
 
 export function cloneAudioBuffer(
   audioBuffer: AudioBuffer,
@@ -101,14 +94,13 @@ export function createSample(
   audioContext: AudioContext,
   fileName?: string
 ): Sample {
-  const sample = {
+  return {
+    mute: false,
     audioBuffer: audioBuffer,
     name: name,
     fileName: fileName,
     velocityNode: audioContext.createGain(),
   };
-
-  return sample;
 }
 
 export function createMeasure(vNotes: string): Measure {
@@ -119,30 +111,32 @@ export function createMeasure(vNotes: string): Measure {
   };
 }
 
-export function createPattern(
-  sample: Sample,
-  measures: Measure[],
-  audioContext: AudioContext
-): Pattern {
-  return {
-    mute: false,
-    sample: sample,
-    measures: measures,
-  };
-}
+// export function createPattern(
+//   sample: Sample,
+//   measures: Measure[],
+//   audioContext: AudioContext
+// ): Pattern {
+//   return {
+//     mute: false,
+//     sample: sample,
+//     measures: measures,
+//   };
+// }
 
 export function createFigure(
+  id: number,
   name: string,
   keyBind: string,
-  measureCount: number,
-  patterns: Pattern[],
+  measures: Measure[][],
+  samples: Sample[],
   audioContext: AudioContext
 ): Figure {
   return {
+    id: id,
     name: name,
     keyBind: keyBind,
-    measureCount: measureCount,
-    patterns: patterns,
+    measures: measures,
+    samples: samples,
   };
 }
 
@@ -335,6 +329,30 @@ export function selectAllText(e: Event) {
   const target = e.target as HTMLInputElement;
   target.select();
 }
+
+export function hzToMel(f: number): number {
+  return 2595 * Math.log10(1 + f / 700);
+}
+
+export function melToX(f: number, w: number): number {
+  const fMax = 24000;
+  const mel = hzToMel(f);
+  const melMax = hzToMel(fMax);
+  return (mel / melMax) * w;
+}
+
+export function melToHz(m: number): number {
+  return 700 * (Math.pow(10, m / 2595) - 1);
+}
+
+export function xToHz(x: number, w: number): number {
+  const fMax = 24000;
+  const melMax = hzToMel(fMax);
+  const mel = (x / w) * melMax;
+  return melToHz(mel);
+}
+
+
 // Ignore below
 
 // export type DragHandler = {
