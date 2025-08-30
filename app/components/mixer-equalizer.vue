@@ -3,7 +3,6 @@ import { melToX, xToHz } from "~/types2";
 
 const audioStore = useAudioStore();
 const audioContext = audioStore.audioContext!;
-const keepDrawing = ref<boolean>(false);
 const fCanvas = ref<HTMLCanvasElement>();
 const aCanvas = ref<HTMLCanvasElement>();
 
@@ -19,11 +18,7 @@ let array = new Uint8Array(audioStore.eq_fftSize);
 watch(
   () => audioStore.isPlaying,
   (value) => {
-    if (value) {
-      keepDrawing.value = true;
-      drawAudio();
-    }
-    if (!value) keepDrawing.value = false;
+    if (value) drawAudio();
   }
 );
 
@@ -91,33 +86,36 @@ function removeFilter(idxF: number) {
 function drawAudio() {
   if (!audioStore.eqAnalyser) return;
   if (!aCanvas.value) return;
-  if (keepDrawing.value) {
+  if (audioStore.isPlaying) {
     const id = requestAnimationFrame(drawAudio);
   }
 
   const w = aCanvas.value.width;
   const h = aCanvas.value.height;
 
+  audioStore.eqAnalyser.getByteTimeDomainData(array);
+
   const canCtx = aCanvas.value.getContext("2d")!;
   canCtx.clearRect(0, 0, w, h);
+  canCtx.lineWidth = 2;
+  canCtx.strokeStyle = "#22d3ee";
+  canCtx.beginPath();
 
-  const barW = (w / audioStore.eqAnalyser.frequencyBinCount) * 2.5;
-  let barH;
+  const slice = w / array.length;
   let x = 0;
 
-  audioStore.eqAnalyser.getByteFrequencyData(array);
-
   for (let i = 0; i < array.length; i++) {
-    barH = array[i]!;
-    canCtx.fillStyle = '#22d3ee';
-    canCtx.fillRect(x, h - barH / 2, barW, barH);
+    let v = array[i]! / 128.0;
+    let y = (v * h) / 2;
 
-    x += barW + 1;
+    if (i === 0) canCtx.moveTo(x, y);
+    else canCtx.lineTo(x, y);
+
+    x += slice;
   }
 
-  if (!keepDrawing.value) {
-    canCtx.clearRect(0, 0, w, h);
-  }
+  canCtx.stroke();
+  if (!audioStore.isPlaying) canCtx.clearRect(0, 0, w, h);
 }
 </script>
 

@@ -78,13 +78,19 @@ export function cloneAudioBuffer(
 }
 
 export function createMixer(audioContext: AudioContext): Mixer {
+  const compressorNode = audioContext.createDynamicsCompressor();
+  compressorNode.attack.value = 0.05;
+  compressorNode.knee.value = 0;
+  compressorNode.ratio.value = 1;
+  compressorNode.threshold.value = 0;
+
   return {
     gainNode: audioContext.createGain(),
     pannerNode: audioContext.createStereoPanner(),
     pitch: 0,
     pitcherNode: new AudioWorkletNode(audioContext, "pitch-processor"),
     filterNodes: [],
-    compressorNode: audioContext.createDynamicsCompressor(),
+    compressorNode: compressorNode,
   };
 }
 

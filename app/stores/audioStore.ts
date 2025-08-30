@@ -26,7 +26,7 @@ export const useAudioStore = defineStore("audioStore", () => {
   const eqAnalyser = ref<AnalyserNode>();
   const compAnalyser = ref<AnalyserNode>();
   const eq_fftSize = 256;
-  const comp_fftSize = 8192;
+  const comp_fftSize = 1024;
 
   const isPlaying = ref<boolean>(false);
   const cursor = ref<number>(0);
