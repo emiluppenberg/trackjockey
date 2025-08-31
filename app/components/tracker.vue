@@ -2,26 +2,26 @@
 const audioStore = useAudioStore();
 const isKeyDown = ref<boolean>(false);
 
-function handlePlayOrStop(e: KeyboardEvent) {
+async function handlePlayOrStop(e: KeyboardEvent) {
   switch (audioStore.isPlaying) {
     case true:
-      audioStore.stopTracker();
+      await audioStore.stopTracker();
       return;
     case false:
-      audioStore.playTracker();
+      await audioStore.startTracker();
       return;
   }
 }
 
 onMounted(() => {
-  const spaceKeyDownListener = (e: KeyboardEvent) => {
+  const spaceKeyDownListener = async (e: KeyboardEvent) => {
     if (e.code === "Space" && !isKeyDown.value) {
       e.preventDefault();
       isKeyDown.value = true;
-      handlePlayOrStop(e);
+      await handlePlayOrStop(e);
     }
   };
-  const spaceKeyUpListener = (e: KeyboardEvent) => {
+  const spaceKeyUpListener = async (e: KeyboardEvent) => {
     isKeyDown.value = false;
   };
 

@@ -4,7 +4,7 @@ const audioStore = useAudioStore();
 const audioContext = audioStore.audioContext!;
 
 function addFigure() {
-  const fLen = audioStore.figures.push(createFigure(audioStore.fLen, "New figure", "", [], [], audioContext));
+  const fLen = audioStore.figures.push(createFigure(audioStore.fLen, "New figure", "", []));
   audioStore.activeFigure = audioStore.figures[fLen - 1];
 }
 function removeFigure(idxF: number) {

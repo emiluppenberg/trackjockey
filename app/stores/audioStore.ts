@@ -11,6 +11,8 @@ import {
   createMeasure,
   type Measure,
   cloneFigure,
+  type Pattern,
+  createPattern,
 } from "~/types2";
 
 export const useAudioStore = defineStore("audioStore", () => {
@@ -110,9 +112,7 @@ export const useAudioStore = defineStore("audioStore", () => {
 
       const fileName = wavs[i]!.split("/").pop();
 
-      samples.value.push(
-        createSample(sample, fileName!, audioContext.value, fileName)
-      );
+      samples.value.push(createSample(sample, fileName!, fileName));
     }
 
     const kick1M = createMeasure("5-5-:5-5-");
@@ -122,13 +122,7 @@ export const useAudioStore = defineStore("audioStore", () => {
     const hihat2M = createMeasure("5-5-5-5-:5---5-23:1-5-5-5-:1-5-5-5-");
     const snare2M = createMeasure("----:5---:-2--:5---");
     const perc2M = createMeasure("---5:---5");
-    const shi3M1 = createMeasure("2");
-    const shi3M2 = createMeasure("");
-
-    type Pattern = {
-      sample: Sample;
-      measures: Measure[];
-    };
+    const shi3M1 = createMeasure("2---:02--");
 
     const patternsRecord: Record<number, Pattern[]> = {
       1: [],
@@ -138,34 +132,43 @@ export const useAudioStore = defineStore("audioStore", () => {
 
     for (const s of samples.value) {
       if (s.fileName?.includes("kick1.wav")) {
-        patternsRecord[1]!.push({ sample: s, measures: [kick1M] });
+        patternsRecord[1]!.push(createPattern(s, [kick1M], audioContext.value));
       }
       if (s.fileName?.includes("hihat1.wav")) {
-        patternsRecord[1]!.push({ sample: s, measures: [hihat1M] });
+        patternsRecord[1]!.push(
+          createPattern(s, [hihat1M], audioContext.value)
+        );
       }
       if (s.fileName?.includes("snare1.wav")) {
-        patternsRecord[1]!.push({ sample: s, measures: [snare1M] });
+        patternsRecord[1]!.push(
+          createPattern(s, [snare1M], audioContext.value)
+        );
       }
       if (s.fileName?.includes("kick2.wav")) {
-        patternsRecord[2]!.push({ sample: s, measures: [kick2M] });
+        patternsRecord[2]!.push(createPattern(s, [kick2M], audioContext.value));
       }
       if (s.fileName?.includes("hihat2.wav")) {
-        patternsRecord[2]!.push({ sample: s, measures: [hihat2M] });
+        patternsRecord[2]!.push(
+          createPattern(s, [hihat2M], audioContext.value)
+        );
       }
       if (s.fileName?.includes("snare2.wav")) {
-        patternsRecord[2]!.push({ sample: s, measures: [snare2M] });
+        patternsRecord[2]!.push(
+          createPattern(s, [snare2M], audioContext.value)
+        );
       }
       if (s.fileName?.includes("perc2.wav")) {
-        patternsRecord[2]!.push({ sample: s, measures: [perc2M] });
+        patternsRecord[2]!.push(createPattern(s, [perc2M], audioContext.value));
       }
       if (s.fileName?.includes("shi3.wav")) {
-        patternsRecord[3]!.push({ sample: s, measures: [shi3M1, shi3M2] });
+        patternsRecord[3]!.push(
+          createPattern(s, [shi3M1], audioContext.value)
+        );
       }
     }
 
     for (let i = 1; i < 4; i++) {
-      let measures: Measure[][] = [];
-      let samples: Sample[] = [];
+      let fPatterns: Pattern[] = [];
       let fName = "";
       let fKeyBind = "";
 
@@ -183,45 +186,13 @@ export const useAudioStore = defineStore("audioStore", () => {
       }
 
       for (const pr of patternsRecord[i]!) {
-        samples.push(pr.sample);
-        measures.push(pr.measures);
+        fPatterns.push(pr);
       }
 
-      figures.value.push(
-        createFigure(
-          fLen.value,
-          fName,
-          fKeyBind,
-          measures,
-          samples,
-          audioContext.value
-        )
-      );
+      figures.value.push(createFigure(fLen.value, fName, fKeyBind, fPatterns));
     }
 
     activeFigure.value = figures.value[0];
-  }
-  async function playSample(s: Sample, velocity: number, melody: number) {
-    if (!audioContext.value) return;
-
-    const vGain = (velocity * 2) / 10;
-    s.velocityNode.gain.value = vGain;
-
-    s.source = audioContext.value.createBufferSource();
-    s.source.buffer = s.audioBuffer;
-
-    const detune = melody * 100;
-    s.source.detune.value = detune;
-
-    s.source.connect(s.velocityNode);
-    s.source.start();
-  }
-
-  async function stopSample(s: Sample) {
-    if (!s.source) return;
-
-    s.source.stop();
-    s.source = undefined;
   }
 
   async function mixerConnect(mixer: Mixer) {
@@ -255,9 +226,10 @@ export const useAudioStore = defineStore("audioStore", () => {
     t.mixer.gainNode.disconnect();
     t.mixer.gainNode.connect(tracker.value.master.pannerNode);
 
-    for (const s of t.figure.samples) {
-      s.velocityNode.disconnect();
-      s.velocityNode.connect(t.mixer.pannerNode);
+    for (const p of t.figure.patterns) {
+      p.velocityNode.disconnect();
+      p.velocityNode.gain.value = 1;
+      p.velocityNode.connect(t.mixer.pannerNode);
     }
   }
 
@@ -279,70 +251,131 @@ export const useAudioStore = defineStore("audioStore", () => {
     activeMixer.value.gainNode.connect(compAnalyser.value);
   }
 
-  async function playTracker() {
-    if (isPlaying.value) return;
-    if (!tracker.value) return;
+  async function stopPattern(p: Pattern) {
+    p.measures.forEach((m) => m.sourceNodes.forEach((sn) => sn.stop()));
+  }
 
-    tracker.value.tracks.forEach((t) => (t.currentMeasureIdx = -1));
-    cursor.value = -1;
-    currentMeasureIdx.value = -1;
-    isPlaying.value = true;
+  function getNextNoteStopTime(p: Pattern, i: number, j: number, cycleStartTime: number, noteLength: number): number {
+    let next_vNote = p.measures[i]!.velocity64[j+1];
+    let next_mOffset;
+    let next_nOffset;
 
-    const advanceCursor = async () => {
-      if (!tracker.value) return;
+    if (next_vNote) {
+      next_mOffset = noteLength * i * 64;
+      next_nOffset = next_vNote.index * noteLength;
+      return cycleStartTime + next_mOffset + next_nOffset;
+    }
+    else {
+      let next_m = p.measures[i+1];
 
-      cursor.value++;
-      if (cursor.value === 64) cursor.value = 0;
+      if (next_m){
+        next_vNote = p.measures[i+1]!.velocity64[0]!;
+        next_mOffset = noteLength * (i + 1) * 64;
+        next_nOffset = next_vNote.index * noteLength;
+        return cycleStartTime + next_mOffset + next_nOffset;
+      }
+      else {
+        const first_Vnote = p.measures[0]!.velocity64[0]!;
+        next_mOffset = noteLength * 0 * 64;
+        next_nOffset = (64 + first_Vnote.index) * noteLength;
+        return cycleStartTime + next_mOffset + next_nOffset;
+      }
+    }
+  }
 
-      let noteLength = (1 / (64 / 4)) * (60 / tracker.value.bpm) * 1000; // milliseconds
+  async function schedulePattern(
+    p: Pattern,
+    noteLength: number,
+    cycleStartTime: number
+  ): Promise<number> {
+    if (!audioContext.value) return 0;
 
-      for (const t of tracker.value.tracks) {
-        if (t.figure && t.figure.measures[0]) {
-          const trackMeasuresLength = t.figure.measures[0].length;
+    for (let i = 0; i < p.measures.length; i++) {
+      const mOffset = noteLength * i * 64;
+      const m = p.measures[i]!;
 
-          if (cursor.value === 0) {
-            if (t.nextMeasureIdxs.length > 0) {
-              t.currentMeasureIdx = t.nextMeasureIdxs[0]!;
-              t.nextMeasureIdxs.splice(0, 1);
-            } else {
-              t.currentMeasureIdx++;
-            }
-          }
+      for (let j = 0; j < m.velocity64.length; j++) {
+        const vNote = m.velocity64[j]!;
+        const nOffset = vNote.index * noteLength;
+        const startTime = cycleStartTime + mOffset + nOffset;
+        const stopTime = getNextNoteStopTime(p, i, j, cycleStartTime, noteLength);
 
-          if (t.currentMeasureIdx < 0) t.currentMeasureIdx = 0; // When changing active track figure
-          if (t.currentMeasureIdx >= trackMeasuresLength)
-            t.currentMeasureIdx = 0;
+        const velocity = (vNote.value * 2) / 10;
+        const pitch = m.pitch64[j]!.value! * 100;
 
-          for (let i = 0; i < t.figure.samples.length; i++) {
-            if (t.figure.samples[i]!.mute) {
-              stopSample(t.figure.samples[i]!);
-            } else {
-              const m = t.figure.measures[i]![t.currentMeasureIdx];
+        const velocityNode = audioContext.value.createGain();
+        const sourceNode = audioContext.value.createBufferSource();
+        sourceNode.buffer = p.sample.audioBuffer;
+        sourceNode.detune.value = pitch;
+        velocityNode.gain.value = velocity;
+        sourceNode.connect(velocityNode).connect(p.velocityNode);
 
-              if (m && m.v64Notes[cursor.value] !== "-") {
-                const velocity = Number(m.v64Notes[cursor.value]);
-                const melody = Number(m.m64Notes[cursor.value]) || 0;
+        m.sourceNodes[j] = sourceNode;
+        m.sourceNodes[j]!.start(startTime);
+        m.sourceNodes[j]!.stop(stopTime);
 
-                if (velocity) {
-                  playSample(t.figure.samples[i]!, velocity, melody);
-                }
-                if (m.v64Notes === "X") {
-                  stopSample(t.figure.samples[i]!);
-                }
-              }
-            }
-          }
+        m.sourceNodes[j]!.onended = () => {
+          velocityNode.disconnect();
+          sourceNode.disconnect();
+        };
+      }
+    }
+
+    return noteLength * p.measures.length * 64; // Total pattern time
+  }
+
+  async function advanceTracker(cycleStartTime: number): Promise<number> {
+    if (!tracker.value) return 0;
+    if (!isPlaying.value) return 0;
+    if (!audioContext.value) return 0;
+
+    let noteLength = 60 / tracker.value.bpm / 16;
+
+    const patternTimes = [];
+
+    for (const t of tracker.value.tracks) {
+      if (t.figure && t.figure.patterns[0]) {
+        for (const p of t.figure.patterns) {
+          if (p.mute) await stopPattern(p);
+          else
+            patternTimes.push(
+              await schedulePattern(p, noteLength, cycleStartTime)
+            );
         }
       }
+    }
 
-      if (!noteLength) await sleep(30);
-      if (noteLength) await sleep(noteLength);
-      if (!isPlaying.value) return;
+    return Math.max(...patternTimes);
+  }
+  async function startTracker() {
+    if (isPlaying.value) return;
+    if (!tracker.value) return;
+    if (!audioContext.value) return;
+
+    // tracker.value.tracks.forEach((t) => (t.currentMeasureIdx = -1));
+    // cursor.value = -1;
+    // currentMeasureIdx.value = -1;
+    isPlaying.value = true;
+    const lookahead = 0.5;
+    const scheduleAhead = 2.0;
+
+    let nextCycleStart = audioContext.value.currentTime + lookahead;
+    let id = 0;
+
+    const cycle = async () => {
+      if (nextCycleStart < audioContext.value!.currentTime + scheduleAhead)
+        nextCycleStart += await advanceTracker(nextCycleStart);
     };
 
-    while (isPlaying.value) {
-      await advanceCursor();
-    }
+    const loop = async () => {
+      if (!isPlaying.value) return;
+
+      await cycle();
+
+      setTimeout(loop, lookahead * 1000);
+    };
+
+    loop();
   }
 
   async function stopTracker() {
@@ -385,9 +418,7 @@ export const useAudioStore = defineStore("audioStore", () => {
     cursor,
     currentMeasureIdx,
     fLen,
-    playSample,
-    stopSample,
-    playTracker,
+    startTracker,
     stopTracker,
     mixerConnect,
     mixerConnectTrack,

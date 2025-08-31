@@ -14,7 +14,7 @@ async function addSample() {
       await newFile.arrayBuffer()
     );
     samples.push(
-      createSample(audioBuffer, newFile.name, audioContext, newFile.name)
+      createSample(audioBuffer, newFile.name, newFile.name)
     );
   }
 }

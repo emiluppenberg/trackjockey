@@ -1,25 +1,35 @@
 export type Measure = {
-  vNotes: string;
-  m64Notes: string[]; // Number instead?
-  v64Notes: string;
+  notes: string;
+  pitch64: Note[];
+  velocity64: Note[];
+  sourceNodes: AudioBufferSourceNode[];
 };
 
+export type Note = {
+  value: number;
+  index: number;
+}
+
 export type Sample = {
-  mute: boolean;
   audioBuffer: AudioBuffer;
-  source?: AudioBufferSourceNode;
   fileName?: string;
   name: string;
   keyBind?: string;
-  velocityNode: GainNode;
 };
 
 export type Figure = {
   id: number;
   name: string;
+  measureCount: number;
   keyBind?: string;
-  measures: Measure[][]; // First dimension indicates associated sample (measures[i][j] belongs to samples[i])
-  samples: Sample[]
+  patterns: Pattern[];
+};
+
+export type Pattern = {
+  mute: boolean;
+  sample: Sample;
+  measures: Measure[];
+  velocityNode: GainNode;
 };
 
 export type Tracker = {
@@ -48,18 +58,41 @@ export type Mixer = {
 export function cloneFigure(f: Figure, audioContext: AudioContext): Figure {
   return {
     ...f,
-    samples: f.samples.map(s => cloneSample(s, audioContext)),
+    patterns: f.patterns.map((p) => clonePattern(p, audioContext)),
+  };
+}
+
+export function clonePattern(p: Pattern, audioContext: AudioContext): Pattern {
+  return {
+    ...p,
+    sample: cloneSample(p.sample, audioContext),
+    measures: p.measures.map((m) => cloneMeasure(m, p.sample, audioContext)),
+    velocityNode: audioContext.createGain()
+  };
+}
+
+export function cloneMeasure(
+  m: Measure,
+  s: Sample,
+  audioContext: AudioContext
+) {
+  return {
+    ...m,
+    sourceNodes: m.sourceNodes.map((sn) => {
+    const newSn = audioContext.createBufferSource();
+    newSn.buffer = cloneAudioBuffer(s.audioBuffer, audioContext);
+    return newSn;
+  })
   };
 }
 
 export function cloneSample(s: Sample, audioContext: AudioContext) {
   return {
     ...s,
-      audioBuffer: cloneAudioBuffer(s.audioBuffer, audioContext),
-      source: undefined,
-      velocityNode: audioContext.createGain(),
-    }
-  }
+    audioBuffer: cloneAudioBuffer(s.audioBuffer, audioContext),
+    velocityNode: audioContext.createGain(),
+  };
+}
 
 export function cloneAudioBuffer(
   audioBuffer: AudioBuffer,
@@ -97,195 +130,101 @@ export function createMixer(audioContext: AudioContext): Mixer {
 export function createSample(
   audioBuffer: AudioBuffer,
   name: string,
-  audioContext: AudioContext,
   fileName?: string
 ): Sample {
   return {
-    mute: false,
     audioBuffer: audioBuffer,
     name: name,
     fileName: fileName,
-    velocityNode: audioContext.createGain(),
   };
 }
 
-export function createMeasure(vNotes: string): Measure {
+export function createMeasure(notes: string): Measure {
   return {
-    vNotes: vNotes,
-    v64Notes: convertTo64Velocity(vNotes),
-    m64Notes: initialize64Melody(vNotes),
+    notes: notes,
+    velocity64: initializeNotes64(notes),
+    pitch64: initializeNotes64(notes),
+    sourceNodes: []
   };
 }
 
-// export function createPattern(
-//   sample: Sample,
-//   measures: Measure[],
-//   audioContext: AudioContext
-// ): Pattern {
-//   return {
-//     mute: false,
-//     sample: sample,
-//     measures: measures,
-//   };
-// }
+export function createPattern(
+  sample: Sample,
+  measures: Measure[],
+  audioContext: AudioContext
+): Pattern {
+  return {
+    mute: false,
+    sample: sample,
+    measures: measures,
+    velocityNode: audioContext.createGain()
+  };
+}
 
 export function createFigure(
   id: number,
   name: string,
   keyBind: string,
-  measures: Measure[][],
-  samples: Sample[],
-  audioContext: AudioContext
+  patterns: Pattern[]
 ): Figure {
   return {
     id: id,
     name: name,
+    measureCount: 0,
     keyBind: keyBind,
-    measures: measures,
-    samples: samples,
+    patterns: patterns,
   };
 }
 
-export function convertTo64Velocity(vNotes: string): string {
-  const fLen = 64 / vNotes.length;
-  let v64Notes = "";
-  let fIdx = 0;
+export function initializeNotes64(notes: string): Note[] {
+  const _notes = notes.replaceAll(':', '');
+  const len = _notes.length;
+  const step = 64 / len;
+  let idx = 0;
+  let notes64: Note[] = [];
 
-  const formatNotes = (c: string) => {
-    v64Notes += c;
-    for (let j = fIdx + 1; j < fLen + fIdx; j++) {
-      v64Notes += "-";
-    }
-    fIdx += fLen;
-  };
+  for (let i = 0; i < _notes.length; i++) {
+    const c = _notes.charAt(i);
 
-  for (let i = 0; i < vNotes.length; i++) {
-    const c = vNotes.charAt(i);
-    switch (c) {
-      case "1":
-        formatNotes(c);
-        break;
-      case "2":
-        formatNotes(c);
-        break;
-      case "3":
-        formatNotes(c);
-        break;
-      case "4":
-        formatNotes(c);
-        break;
-      case "5":
-        formatNotes(c);
-        break;
-      case "6":
-        formatNotes(c);
-        break;
-      case "7":
-        formatNotes(c);
-        break;
-      case "8":
-        formatNotes(c);
-        break;
-      case "9":
-        formatNotes(c);
-        break;
-      case "X":
-        formatNotes(c);
-        break;
-      case "-":
-        formatNotes(c);
-        break;
-      case ":":
-        break;
-      default:
-        alert("Invalid note input (character) conversion");
-        return "";
-    }
+    if (!isNaN(Number(c))) {
+      notes64.push({value: Number(c), index: idx});
+    };
+
+    idx += step;
   }
 
-  return v64Notes;
+  return notes64;
 }
 
-export function initialize64Melody(vNotes: string): string[] {
-  const fLen = 64 / vNotes.length;
-  let m64Notes: string[] = [];
-  let fIdx = 0;
-
-  const formatNotes = (c: string) => {
-    if (Number(c)) {
-      m64Notes.push("0");
-    } else {
-      m64Notes.push(c);
-    }
-
-    for (let j = fIdx + 1; j < fLen + fIdx; j++) {
-      m64Notes.push("-");
-    }
-    fIdx += fLen;
-  };
-
-  for (let i = 0; i < vNotes.length; i++) {
-    const c = vNotes.charAt(i);
-    switch (c) {
-      case "1":
-        formatNotes(c);
-        break;
-      case "2":
-        formatNotes(c);
-        break;
-      case "3":
-        formatNotes(c);
-        break;
-      case "4":
-        formatNotes(c);
-        break;
-      case "5":
-        formatNotes(c);
-        break;
-      case "6":
-        formatNotes(c);
-        break;
-      case "7":
-        formatNotes(c);
-        break;
-      case "8":
-        formatNotes(c);
-        break;
-      case "9":
-        formatNotes(c);
-        break;
-      case "X":
-        formatNotes(c);
-        break;
-      case "-":
-        formatNotes(c);
-        break;
-      case ":":
-        break;
-      default:
-        alert("Invalid note input (character) conversion");
-        return [];
-    }
+export function getPitchIndex(idxC: number, m: Measure): Note {
+  let idxP = 0;
+  
+  for (let i = 0; i < idxC; i++){
+    if (m.notes[i] !== ':') idxP++;
   }
+  
+  const _notes = m.notes.replaceAll(':', '');
 
-  return m64Notes;
+  const len = _notes.length;
+  const step = 64 / len;
+  return m.pitch64[idxP * step]!;
 }
 
-export function getMelodyIndex(idxC: number, vNotes: string): number {
+export function getMelodyIndex(idxC: number, notes: string): number {
   let idxM = 0;
-  let _vNotes = "";
+  let _notes = "";
 
   for (let i = 0; i < idxC; i++) {
-    const c = vNotes.charAt(i);
+    const c = notes.charAt(i);
     if (c !== ":") idxM++;
   }
 
-  for (let i = 0; i < vNotes.length; i++) {
-    const c = vNotes.charAt(i);
-    if (c !== ":") _vNotes += c;
+  for (let i = 0; i < notes.length; i++) {
+    const c = notes.charAt(i);
+    if (c !== ":") _notes += c;
   }
 
-  const fLen = 64 / _vNotes.length;
+  const fLen = 64 / _notes.length;
   return fLen * idxM;
 }
 
@@ -300,8 +239,8 @@ export function getCursorForVNotes(
   let colonIndices: number[] = [];
   let currentNoteIdx: number = idxC;
 
-  for (let i = 0; i < m.vNotes.length; i++) {
-    if (m.vNotes[i] === ":") colonIndices.push(i);
+  for (let i = 0; i < m.notes.length; i++) {
+    if (m.notes[i] === ":") colonIndices.push(i);
   }
 
   if (colonIndices.includes(idxC)) return false;
@@ -310,7 +249,7 @@ export function getCursorForVNotes(
     if (idxC > colonIdx) currentNoteIdx -= 1;
   }
 
-  const vNotesClean = m.vNotes.replaceAll(":", "");
+  const vNotesClean = m.notes.replaceAll(":", "");
   const fLen = 64 / vNotesClean.length;
   const nextNoteIdx = currentNoteIdx + 1;
 
@@ -357,7 +296,6 @@ export function xToHz(x: number, w: number): number {
   const mel = (x / w) * melMax;
   return melToHz(mel);
 }
-
 
 // Ignore below
 
