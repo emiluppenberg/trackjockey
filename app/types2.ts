@@ -2,7 +2,6 @@ export type Measure = {
   notes: string;
   pitch64: Note[];
   velocity64: Note[];
-  sourceNodes: AudioBufferSourceNode[];
 };
 
 export type Note = {
@@ -28,6 +27,7 @@ export type Figure = {
 export type Pattern = {
   mute: boolean;
   sample: Sample;
+  sourceNode: AudioBufferSourceNode;
   measures: Measure[];
   velocityNode: GainNode;
 };
@@ -78,11 +78,11 @@ export function cloneMeasure(
 ) {
   return {
     ...m,
-    sourceNodes: m.sourceNodes.map((sn) => {
-    const newSn = audioContext.createBufferSource();
-    newSn.buffer = cloneAudioBuffer(s.audioBuffer, audioContext);
-    return newSn;
-  })
+  //   sourceNodes: m.sourceNodes.map((sn) => {
+  //   const newSn = audioContext.createBufferSource();
+  //   newSn.buffer = cloneAudioBuffer(s.audioBuffer, audioContext);
+  //   return newSn;
+  // })
   };
 }
 
@@ -144,7 +144,6 @@ export function createMeasure(notes: string): Measure {
     notes: notes,
     velocity64: initializeNotes64(notes),
     pitch64: initializeNotes64(notes),
-    sourceNodes: []
   };
 }
 
@@ -156,6 +155,7 @@ export function createPattern(
   return {
     mute: false,
     sample: sample,
+    sourceNode: audioContext.createBufferSource(),
     measures: measures,
     velocityNode: audioContext.createGain()
   };
