@@ -13,11 +13,11 @@ function addPattern() {
   let measures: Measure[] = [];
 
   for (let i = 0; i < audioStore.activeFigure.measureCount; i++) {
-    measures.push(createMeasure(""));
+    measures.push(createMeasure("0"));
   }
 
   audioStore.activeFigure.patterns.push(
-    createPattern(audioStore.samples[0]!, [], audioStore.audioContext)
+    createPattern(audioStore.samples[0]!, measures, audioStore.audioContext)
   );
 
   audioStore.reloadActiveFigureTracks();
@@ -36,7 +36,7 @@ function addMeasure() {
 
   audioStore.activeFigure.measureCount++;
   audioStore.activeFigure.patterns.forEach((p) =>
-    p.measures.push(createMeasure(""))
+    p.measures.push(createMeasure("0"))
   );
 }
 

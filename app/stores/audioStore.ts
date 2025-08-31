@@ -380,8 +380,6 @@ export const useAudioStore = defineStore("audioStore", () => {
     if (!isPlaying.value) return 0;
     if (!audioContext.value) return 0;
 
-    let noteLength = 60 / tracker.value.bpm / 16;
-
     const patternTimes: number[] = [];
 
     for (const t of tracker.value.tracks) {
@@ -409,14 +407,48 @@ export const useAudioStore = defineStore("audioStore", () => {
     // currentMeasureIdx.value = -1;
     isPlaying.value = true;
     const lookahead = 0.5;
-    const scheduleAhead = 2.0;
+    const scheduleAhead = 1.0;
+    let noteLength = 60 / tracker.value.bpm / 16;
 
     let nextCycleStart = audioContext.value.currentTime + lookahead;
     let id = 0;
 
     const cycle = async () => {
+      if (!tracker.value) return;
+
+      const measuresLength = Math.max(
+        ...tracker.value.tracks.map((t) => {
+          return t.figure?.patterns[0]?.measures.length || 0;
+        })
+      );
+
       if (nextCycleStart < audioContext.value!.currentTime + scheduleAhead)
-        nextCycleStart += await advanceTracker(nextCycleStart);
+        for (let i = 0; i < measuresLength; i++) {
+          
+          for (const t of tracker.value.tracks) {
+            if (t.figure) {
+              for (const p of t.figure.patterns) {
+                if (p.mute) stopPattern(p);
+                else {
+                  if (t.nextMeasureIdxs.length > 0) {
+                    t.currentMeasureIdx = t.nextMeasureIdxs[0]!;
+                    t.nextMeasureIdxs.splice(0, 1);
+                  } else t.currentMeasureIdx = i;
+
+                  scheduleMeasure(
+                    p.measures[t.currentMeasureIdx]!,
+                    t.currentMeasureIdx,
+                    p,
+                    noteLength,
+                    nextCycleStart
+                  );
+                }
+              }
+            }
+          }
+
+          nextCycleStart += noteLength * 64;
+        }
     };
 
     const loop = async () => {
