@@ -161,9 +161,7 @@ export const useAudioStore = defineStore("audioStore", () => {
         patternsRecord[2]!.push(createPattern(s, [perc2M], audioContext.value));
       }
       if (s.fileName?.includes("shi3.wav")) {
-        patternsRecord[3]!.push(
-          createPattern(s, [shi3M1], audioContext.value)
-        );
+        patternsRecord[3]!.push(createPattern(s, [shi3M1], audioContext.value));
       }
     }
 
@@ -255,31 +253,78 @@ export const useAudioStore = defineStore("audioStore", () => {
     p.measures.forEach((m) => m.sourceNodes.forEach((sn) => sn.stop()));
   }
 
-  function getNextNoteStopTime(p: Pattern, i: number, j: number, cycleStartTime: number, noteLength: number): number {
-    let next_vNote = p.measures[i]!.velocity64[j+1];
+  function getNextNoteStopTime(
+    p: Pattern,
+    idxM: number,
+    idxN: number,
+    cycleStartTime: number,
+    noteLength: number
+  ): number {
+    let next_vNote = p.measures[idxM]!.velocity64[idxN + 1];
     let next_mOffset;
     let next_nOffset;
 
     if (next_vNote) {
-      next_mOffset = noteLength * i * 64;
+      next_mOffset = noteLength * idxM * 64;
       next_nOffset = next_vNote.index * noteLength;
       return cycleStartTime + next_mOffset + next_nOffset;
-    }
-    else {
-      let next_m = p.measures[i+1];
+    } else {
+      let next_m = p.measures[idxM + 1];
 
-      if (next_m){
-        next_vNote = p.measures[i+1]!.velocity64[0]!;
-        next_mOffset = noteLength * (i + 1) * 64;
+      if (next_m) {
+        next_vNote = p.measures[idxM + 1]!.velocity64[0]!;
+        next_mOffset = noteLength * (idxM + 1) * 64;
         next_nOffset = next_vNote.index * noteLength;
         return cycleStartTime + next_mOffset + next_nOffset;
-      }
-      else {
+      } else {
         const first_Vnote = p.measures[0]!.velocity64[0]!;
         next_mOffset = noteLength * 0 * 64;
         next_nOffset = (64 + first_Vnote.index) * noteLength;
         return cycleStartTime + next_mOffset + next_nOffset;
       }
+    }
+  }
+
+  function scheduleMeasure(
+    m: Measure,
+    idxM: number,
+    p: Pattern,
+    noteLength: number,
+    cycleStartTime: number
+  ) {
+    if (!audioContext.value) return 0;
+    const mOffset = noteLength * idxM * 64;
+
+    for (let idxN = 0; idxN < m.velocity64.length; idxN++) {
+      const vNote = m.velocity64[idxN]!;
+      const nOffset = vNote.index * noteLength;
+      const startTime = cycleStartTime + mOffset + nOffset;
+      const stopTime = getNextNoteStopTime(
+        p,
+        idxM,
+        idxN,
+        cycleStartTime,
+        noteLength
+      );
+
+      const velocity = (vNote.value * 2) / 10;
+      const pitch = m.pitch64[idxN]!.value! * 100;
+
+      const velocityNode = audioContext.value.createGain();
+      const sourceNode = audioContext.value.createBufferSource();
+      sourceNode.buffer = p.sample.audioBuffer;
+      sourceNode.detune.value = pitch;
+      velocityNode.gain.value = velocity;
+      sourceNode.connect(velocityNode).connect(p.velocityNode);
+
+      m.sourceNodes[idxN] = sourceNode;
+      m.sourceNodes[idxN]!.start(startTime);
+      m.sourceNodes[idxN]!.stop(stopTime);
+
+      m.sourceNodes[idxN]!.onended = () => {
+        velocityNode.disconnect();
+        sourceNode.disconnect();
+      };
     }
   }
 
@@ -298,7 +343,13 @@ export const useAudioStore = defineStore("audioStore", () => {
         const vNote = m.velocity64[j]!;
         const nOffset = vNote.index * noteLength;
         const startTime = cycleStartTime + mOffset + nOffset;
-        const stopTime = getNextNoteStopTime(p, i, j, cycleStartTime, noteLength);
+        const stopTime = getNextNoteStopTime(
+          p,
+          i,
+          j,
+          cycleStartTime,
+          noteLength
+        );
 
         const velocity = (vNote.value * 2) / 10;
         const pitch = m.pitch64[j]!.value! * 100;
@@ -331,16 +382,17 @@ export const useAudioStore = defineStore("audioStore", () => {
 
     let noteLength = 60 / tracker.value.bpm / 16;
 
-    const patternTimes = [];
+    const patternTimes: number[] = [];
 
     for (const t of tracker.value.tracks) {
       if (t.figure && t.figure.patterns[0]) {
         for (const p of t.figure.patterns) {
           if (p.mute) await stopPattern(p);
-          else
-            patternTimes.push(
-              await schedulePattern(p, noteLength, cycleStartTime)
-            );
+          else {
+            if (t.nextMeasureIdxs.length > 0) {
+              for (let i = 0; i < t.nextMeasureIdxs.length; i++) {} // TODO
+            }
+          }
         }
       }
     }
