@@ -38,6 +38,8 @@ export const useAudioStore = defineStore("audioStore", () => {
     return figures.value.length;
   });
 
+  const velPool = ref<GainNode[]>([]);
+
   onMounted(async () => {
     audioContext.value = new AudioContext();
     await audioContext.value.audioWorklet.addModule("/pitch-processor.js");
@@ -51,7 +53,7 @@ export const useAudioStore = defineStore("audioStore", () => {
         {
           figure: undefined,
           mixer: createMixer(audioContext.value),
-          currentMeasureIdx: -1,
+          currentMeasureIdx: 0,
           nextMeasureIdxs: [],
         },
       ],
@@ -86,6 +88,175 @@ export const useAudioStore = defineStore("audioStore", () => {
     }
   );
 
+  function getGain(): GainNode {
+    return velPool.value!.pop() || audioContext.value!.createGain();
+  }
+
+  function recycle(velNode: GainNode) {
+    try {
+      velNode.disconnect();
+    } catch (e) {
+      console.log(e);
+    }
+
+    velPool.value!.push(velNode);
+  }
+
+  async function startTracker() {
+    if (isPlaying.value) return;
+
+    isPlaying.value = true;
+    tracker.value!.tracks.forEach((t) => (t.currentMeasureIdx = 0));
+    const lookahead = 0.2;
+    const scheduleAhead = 0.5;
+    let noteLen = 60 / tracker.value!.bpm / 16;
+    let cycleStart = audioContext.value!.currentTime + lookahead;
+
+    const loop = async () => {
+      if (!isPlaying.value) return;
+
+      if (cycleStart < audioContext.value!.currentTime + scheduleAhead) {
+        for (const t of tracker.value!.tracks) {
+          if (!t.figure) continue;
+
+          console.log(audioContext.value?.currentTime);
+          queueMicrotask(() => {
+            cycleTrackPatterns(t, noteLen, cycleStart);
+          });
+        }
+
+        cycleStart += noteLen * 64;
+      }
+
+      setTimeout(loop, lookahead * 1000);
+    };
+
+    loop();
+  }
+
+  function cycleTrackPatterns(t: Track, noteLen: number, cycleStart: number) {
+    if (t.currentMeasureIdx >= t.figure!.measureCount) t.currentMeasureIdx = 0;
+
+    if (t.nextMeasureIdxs.length > 0) {
+      t.currentMeasureIdx = t.nextMeasureIdxs[0]!;
+      t.nextMeasureIdxs.splice(0, 1);
+    }
+
+    for (const p of t.figure!.patterns) {
+      if (p.mute)
+        p.measures.forEach((m) => m.srcNodes.forEach((sn) => sn.stop()));
+      else {
+        const _currentMeasureIdx = t.currentMeasureIdx;
+        queueMicrotask(() =>
+          cycleMeasureNotes(
+            p.measures[_currentMeasureIdx]!,
+            _currentMeasureIdx,
+            p,
+            noteLen,
+            cycleStart
+          )
+        );
+      }
+    }
+
+    if (t.figure!.measureCount > 1) t.currentMeasureIdx++;
+
+    return {
+      currentTime: audioContext.value!.currentTime,
+      start: cycleStart,
+    };
+  }
+
+  function cycleMeasureNotes(
+    m: Measure,
+    idxM: number,
+    p: Pattern,
+    noteLen: number,
+    cycleStart: number
+  ) {
+    for (let idxN = 0; idxN < m.velocity64.length; idxN++) {
+      queueMicrotask(() => scheduleNote(m, idxM, idxN, p, noteLen, cycleStart));
+    }
+
+    return {
+      currentTime: audioContext.value!.currentTime,
+      start: cycleStart,
+    };
+  }
+
+  function scheduleNote(
+    m: Measure,
+    idxM: number,
+    idxN: number,
+    p: Pattern,
+    noteLen: number,
+    cycleStart: number
+  ) {
+    const vNote = m.velocity64[idxN]!;
+    const nOffset = vNote.index * noteLen;
+    const startTime = cycleStart + nOffset;
+    const stopTime = getNextNoteStopTime(p, idxM, idxN, cycleStart, noteLen);
+
+    const velocity = (vNote.value * 2) / 10;
+    const pitch = m.pitch64[idxN]!.value! * 100;
+
+    const velNode = getGain();
+    const srcNode = audioContext.value!.createBufferSource();
+    srcNode.buffer = p.sample.audioBuffer;
+    srcNode.detune.value = pitch;
+    velNode.gain.value = velocity;
+    srcNode.connect(velNode).connect(p.velocityNode);
+
+    srcNode.start(startTime);
+    srcNode.stop(stopTime);
+
+    srcNode.onended = () => recycle(velNode);
+
+    m.srcNodes[idxN] = srcNode;
+
+    return {
+      currentTime: audioContext.value!.currentTime,
+      start: cycleStart,
+    };
+  }
+
+  function getNextNoteStopTime(
+    p: Pattern,
+    idxM: number,
+    idxN: number,
+    cycleStart: number,
+    noteLen: number
+  ): number {
+    let next_vNote = p.measures[idxM]!.velocity64[idxN + 1];
+    let next_mOffset;
+    let next_nOffset;
+
+    if (next_vNote) {
+      next_mOffset = noteLen * idxM * 64;
+      next_nOffset = next_vNote.index * noteLen;
+      return cycleStart + next_mOffset + next_nOffset;
+    } else {
+      let next_m = p.measures[idxM + 1];
+
+      if (next_m) {
+        next_vNote = p.measures[idxM + 1]!.velocity64[0]!;
+        next_mOffset = noteLen * (idxM + 1) * 64;
+        next_nOffset = next_vNote.index * noteLen;
+        return cycleStart + next_mOffset + next_nOffset;
+      } else {
+        const first_Vnote = p.measures[0]!.velocity64[0]!;
+        next_mOffset = noteLen * 0 * 64;
+        next_nOffset = (64 + first_Vnote.index) * noteLen;
+        return cycleStart + next_mOffset + next_nOffset;
+      }
+    }
+  }
+
+  async function stopTracker() {
+    isPlaying.value = false;
+    cursor.value = 0;
+  }
+
   async function loadFigures() {
     if (!audioContext.value) return;
 
@@ -118,10 +289,18 @@ export const useAudioStore = defineStore("audioStore", () => {
     const kick1M = createMeasure("5-5-:5-5-");
     const hihat1M = createMeasure("-5-5:-5-5");
     const snare1M = createMeasure("--5-:--5-");
-    const kick2M = createMeasure("5---:5--2:-25-:--5-");
-    const hihat2M = createMeasure("5-5-5-5-:5---5-23:1-5-5-5-:1-5-5-5-");
-    const snare2M = createMeasure("----:5---:-2--:5---");
-    const perc2M = createMeasure("---5:---5");
+
+    const kick2M1 = createMeasure("5---:5--2:-25-:--5-");
+    const hihat2M1 = createMeasure("5-5-5-5-:5---5-23:1-5-5-5-:1-5-5-5-");
+    const snare2M1 = createMeasure("----:5---:-2--:5---");
+    const kick2M2 = createMeasure("5---:5--2:-25-:--5-");
+    const hihat2M2 = createMeasure("5-5-5-5-:5---5-23:1-5-5-5-:1-5-5-5-");
+    const snare2M2 = createMeasure("0-");
+    const kick2M3 = createMeasure("0-");
+    const hihat2M3 = createMeasure("5-5-5-5-:5---5-23:1-5-5-5-:1-5-5-5-");
+    const snare2M3 = createMeasure("5---:5--2:-25-:--5-");
+    const perc2M1 = createMeasure("---5:---5");
+
     const shi3M1 = createMeasure("2---:02--");
 
     const patternsRecord: Record<number, Pattern[]> = {
@@ -145,20 +324,24 @@ export const useAudioStore = defineStore("audioStore", () => {
         );
       }
       if (s.fileName?.includes("kick2.wav")) {
-        patternsRecord[2]!.push(createPattern(s, [kick2M], audioContext.value));
+        patternsRecord[2]!.push(
+          createPattern(s, [kick2M1, kick2M2, kick2M3], audioContext.value)
+        );
       }
       if (s.fileName?.includes("hihat2.wav")) {
         patternsRecord[2]!.push(
-          createPattern(s, [hihat2M], audioContext.value)
+          createPattern(s, [hihat2M1, hihat2M2, hihat2M3], audioContext.value)
         );
       }
       if (s.fileName?.includes("snare2.wav")) {
         patternsRecord[2]!.push(
-          createPattern(s, [snare2M], audioContext.value)
+          createPattern(s, [snare2M1, snare2M2, snare2M3], audioContext.value)
         );
       }
       if (s.fileName?.includes("perc2.wav")) {
-        patternsRecord[2]!.push(createPattern(s, [perc2M], audioContext.value));
+        patternsRecord[2]!.push(
+          createPattern(s, [perc2M1, perc2M1, perc2M1], audioContext.value)
+        );
       }
       if (s.fileName?.includes("shi3.wav")) {
         patternsRecord[3]!.push(createPattern(s, [shi3M1], audioContext.value));
@@ -247,224 +430,6 @@ export const useAudioStore = defineStore("audioStore", () => {
     compAnalyser.value = audioContext.value.createAnalyser();
     compAnalyser.value.fftSize = comp_fftSize;
     activeMixer.value.gainNode.connect(compAnalyser.value);
-  }
-
-  async function stopPattern(p: Pattern) {
-    p.measures.forEach((m) => m.sourceNodes.forEach((sn) => sn.stop()));
-  }
-
-  function getNextNoteStopTime(
-    p: Pattern,
-    idxM: number,
-    idxN: number,
-    cycleStartTime: number,
-    noteLength: number
-  ): number {
-    let next_vNote = p.measures[idxM]!.velocity64[idxN + 1];
-    let next_mOffset;
-    let next_nOffset;
-
-    if (next_vNote) {
-      next_mOffset = noteLength * idxM * 64;
-      next_nOffset = next_vNote.index * noteLength;
-      return cycleStartTime + next_mOffset + next_nOffset;
-    } else {
-      let next_m = p.measures[idxM + 1];
-
-      if (next_m) {
-        next_vNote = p.measures[idxM + 1]!.velocity64[0]!;
-        next_mOffset = noteLength * (idxM + 1) * 64;
-        next_nOffset = next_vNote.index * noteLength;
-        return cycleStartTime + next_mOffset + next_nOffset;
-      } else {
-        const first_Vnote = p.measures[0]!.velocity64[0]!;
-        next_mOffset = noteLength * 0 * 64;
-        next_nOffset = (64 + first_Vnote.index) * noteLength;
-        return cycleStartTime + next_mOffset + next_nOffset;
-      }
-    }
-  }
-
-  function scheduleMeasure(
-    m: Measure,
-    idxM: number,
-    p: Pattern,
-    noteLength: number,
-    cycleStartTime: number
-  ) {
-    if (!audioContext.value) return 0;
-    const mOffset = noteLength * idxM * 64;
-
-    for (let idxN = 0; idxN < m.velocity64.length; idxN++) {
-      const vNote = m.velocity64[idxN]!;
-      const nOffset = vNote.index * noteLength;
-      const startTime = cycleStartTime + mOffset + nOffset;
-      const stopTime = getNextNoteStopTime(
-        p,
-        idxM,
-        idxN,
-        cycleStartTime,
-        noteLength
-      );
-
-      const velocity = (vNote.value * 2) / 10;
-      const pitch = m.pitch64[idxN]!.value! * 100;
-
-      const velocityNode = audioContext.value.createGain();
-      const sourceNode = audioContext.value.createBufferSource();
-      sourceNode.buffer = p.sample.audioBuffer;
-      sourceNode.detune.value = pitch;
-      velocityNode.gain.value = velocity;
-      sourceNode.connect(velocityNode).connect(p.velocityNode);
-
-      m.sourceNodes[idxN] = sourceNode;
-      m.sourceNodes[idxN]!.start(startTime);
-      m.sourceNodes[idxN]!.stop(stopTime);
-
-      m.sourceNodes[idxN]!.onended = () => {
-        velocityNode.disconnect();
-        sourceNode.disconnect();
-      };
-    }
-  }
-
-  async function schedulePattern(
-    p: Pattern,
-    noteLength: number,
-    cycleStartTime: number
-  ): Promise<number> {
-    if (!audioContext.value) return 0;
-
-    for (let i = 0; i < p.measures.length; i++) {
-      const mOffset = noteLength * i * 64;
-      const m = p.measures[i]!;
-
-      for (let j = 0; j < m.velocity64.length; j++) {
-        const vNote = m.velocity64[j]!;
-        const nOffset = vNote.index * noteLength;
-        const startTime = cycleStartTime + mOffset + nOffset;
-        const stopTime = getNextNoteStopTime(
-          p,
-          i,
-          j,
-          cycleStartTime,
-          noteLength
-        );
-
-        const velocity = (vNote.value * 2) / 10;
-        const pitch = m.pitch64[j]!.value! * 100;
-
-        const velocityNode = audioContext.value.createGain();
-        const sourceNode = audioContext.value.createBufferSource();
-        sourceNode.buffer = p.sample.audioBuffer;
-        sourceNode.detune.value = pitch;
-        velocityNode.gain.value = velocity;
-        sourceNode.connect(velocityNode).connect(p.velocityNode);
-
-        m.sourceNodes[j] = sourceNode;
-        m.sourceNodes[j]!.start(startTime);
-        m.sourceNodes[j]!.stop(stopTime);
-
-        m.sourceNodes[j]!.onended = () => {
-          velocityNode.disconnect();
-          sourceNode.disconnect();
-        };
-      }
-    }
-
-    return noteLength * p.measures.length * 64; // Total pattern time
-  }
-
-  async function advanceTracker(cycleStartTime: number): Promise<number> {
-    if (!tracker.value) return 0;
-    if (!isPlaying.value) return 0;
-    if (!audioContext.value) return 0;
-
-    const patternTimes: number[] = [];
-
-    for (const t of tracker.value.tracks) {
-      if (t.figure && t.figure.patterns[0]) {
-        for (const p of t.figure.patterns) {
-          if (p.mute) await stopPattern(p);
-          else {
-            if (t.nextMeasureIdxs.length > 0) {
-              for (let i = 0; i < t.nextMeasureIdxs.length; i++) {} // TODO
-            }
-          }
-        }
-      }
-    }
-
-    return Math.max(...patternTimes);
-  }
-  async function startTracker() {
-    if (isPlaying.value) return;
-    if (!tracker.value) return;
-    if (!audioContext.value) return;
-
-    // tracker.value.tracks.forEach((t) => (t.currentMeasureIdx = -1));
-    // cursor.value = -1;
-    // currentMeasureIdx.value = -1;
-    isPlaying.value = true;
-    const lookahead = 0.5;
-    const scheduleAhead = 1.0;
-    let noteLength = 60 / tracker.value.bpm / 16;
-
-    let nextCycleStart = audioContext.value.currentTime + lookahead;
-    let id = 0;
-
-    const cycle = async () => {
-      if (!tracker.value) return;
-
-      const measuresLength = Math.max(
-        ...tracker.value.tracks.map((t) => {
-          return t.figure?.patterns[0]?.measures.length || 0;
-        })
-      );
-
-      if (nextCycleStart < audioContext.value!.currentTime + scheduleAhead)
-        for (let i = 0; i < measuresLength; i++) {
-          
-          for (const t of tracker.value.tracks) {
-            if (t.figure) {
-              for (const p of t.figure.patterns) {
-                if (p.mute) stopPattern(p);
-                else {
-                  if (t.nextMeasureIdxs.length > 0) {
-                    t.currentMeasureIdx = t.nextMeasureIdxs[0]!;
-                    t.nextMeasureIdxs.splice(0, 1);
-                  } else t.currentMeasureIdx = i;
-
-                  scheduleMeasure(
-                    p.measures[t.currentMeasureIdx]!,
-                    t.currentMeasureIdx,
-                    p,
-                    noteLength,
-                    nextCycleStart
-                  );
-                }
-              }
-            }
-          }
-
-          nextCycleStart += noteLength * 64;
-        }
-    };
-
-    const loop = async () => {
-      if (!isPlaying.value) return;
-
-      await cycle();
-
-      setTimeout(loop, lookahead * 1000);
-    };
-
-    loop();
-  }
-
-  async function stopTracker() {
-    isPlaying.value = false;
-    cursor.value = 0;
   }
 
   function reloadActiveFigureTracks() {

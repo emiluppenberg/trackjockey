@@ -2,7 +2,7 @@ export type Measure = {
   notes: string;
   pitch64: Note[];
   velocity64: Note[];
-  sourceNodes: AudioBufferSourceNode[];
+  srcNodes: AudioBufferSourceNode[];
 };
 
 export type Note = {
@@ -78,7 +78,7 @@ export function cloneMeasure(
 ) {
   return {
     ...m,
-    sourceNodes: m.sourceNodes.map((sn) => {
+    srcNodes: m.srcNodes.map((sn) => {
     const newSn = audioContext.createBufferSource();
     newSn.buffer = cloneAudioBuffer(s.audioBuffer, audioContext);
     return newSn;
@@ -144,7 +144,7 @@ export function createMeasure(notes: string): Measure {
     notes: notes,
     velocity64: initializeNotes64(notes),
     pitch64: initializeNotes64(notes),
-    sourceNodes: []
+    srcNodes: []
   };
 }
 
@@ -170,7 +170,7 @@ export function createFigure(
   return {
     id: id,
     name: name,
-    measureCount: 0,
+    measureCount: patterns[0]!.measures.length,
     keyBind: keyBind,
     patterns: patterns,
   };

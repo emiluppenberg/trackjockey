@@ -32,7 +32,7 @@ function changeTracksLength(e: Event) {
         tracker.tracks.push({
           figure: undefined,
           mixer: createMixer(audioStore.audioContext!),
-          currentMeasureIdx: -1,
+          currentMeasureIdx: 0,
           nextMeasureIdxs: [],
         });
       }
