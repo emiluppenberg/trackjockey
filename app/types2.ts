@@ -2,13 +2,14 @@ export type Measure = {
   notes: string;
   pitch64: Note[];
   velocity64: Note[];
-  srcNodes: AudioBufferSourceNode[];
+  idx64: number;
+  index: number;
 };
 
 export type Note = {
   value: number;
-  index: number;
-}
+  pos64: number;
+};
 
 export type Sample = {
   audioBuffer: AudioBuffer;
@@ -29,6 +30,10 @@ export type Pattern = {
   mute: boolean;
   sample: Sample;
   measures: Measure[];
+  notePos: number[][];
+  currentMeasure: number;
+  currentPos: number;
+  srcNodes: AudioBufferSourceNode[];
   velocityNode: GainNode;
 };
 
@@ -67,7 +72,12 @@ export function clonePattern(p: Pattern, audioContext: AudioContext): Pattern {
     ...p,
     sample: cloneSample(p.sample, audioContext),
     measures: p.measures.map((m) => cloneMeasure(m, p.sample, audioContext)),
-    velocityNode: audioContext.createGain()
+    velocityNode: audioContext.createGain(),
+    srcNodes: p.srcNodes.map((sn) => {
+      const newSn = audioContext.createBufferSource();
+      newSn.buffer = cloneAudioBuffer(p.sample.audioBuffer, audioContext);
+      return newSn;
+    }),
   };
 }
 
@@ -78,11 +88,6 @@ export function cloneMeasure(
 ) {
   return {
     ...m,
-    srcNodes: m.srcNodes.map((sn) => {
-    const newSn = audioContext.createBufferSource();
-    newSn.buffer = cloneAudioBuffer(s.audioBuffer, audioContext);
-    return newSn;
-  })
   };
 }
 
@@ -139,12 +144,29 @@ export function createSample(
   };
 }
 
-export function createMeasure(notes: string): Measure {
+export function createMeasures(array: string[]): Measure[] {
+  let measures: Measure[] = [];
+
+  for (let i = 0; i < array.length; i++) {
+    measures.push({
+      notes: array[i]!,
+      velocity64: initializeNotes64(array[i]!),
+      pitch64: initializeNotes64(array[i]!),
+      idx64: 0,
+      index: i,
+    });
+  }
+
+  return measures;
+}
+
+export function createMeasure(notes: string, index: number): Measure {
   return {
     notes: notes,
     velocity64: initializeNotes64(notes),
     pitch64: initializeNotes64(notes),
-    srcNodes: []
+    idx64: 0,
+    index: index,
   };
 }
 
@@ -157,7 +179,11 @@ export function createPattern(
     mute: false,
     sample: sample,
     measures: measures,
-    velocityNode: audioContext.createGain()
+    velocityNode: audioContext.createGain(),
+    srcNodes: [],
+    currentMeasure: 0,
+    currentPos: 0,
+    notePos: measures.map((m, i) => m.velocity64.map((v, j) => j)),
   };
 }
 
@@ -177,7 +203,7 @@ export function createFigure(
 }
 
 export function initializeNotes64(notes: string): Note[] {
-  const _notes = notes.replaceAll(':', '');
+  const _notes = notes.replaceAll(":", "");
   const len = _notes.length;
   const step = 64 / len;
   let idx = 0;
@@ -187,8 +213,8 @@ export function initializeNotes64(notes: string): Note[] {
     const c = _notes.charAt(i);
 
     if (!isNaN(Number(c))) {
-      notes64.push({value: Number(c), index: idx});
-    };
+      notes64.push({ value: Number(c), pos64: idx });
+    }
 
     idx += step;
   }
@@ -198,12 +224,12 @@ export function initializeNotes64(notes: string): Note[] {
 
 export function getPitchIndex(idxC: number, m: Measure): Note {
   let idxP = 0;
-  
-  for (let i = 0; i < idxC; i++){
-    if (m.notes[i] !== ':') idxP++;
+
+  for (let i = 0; i < idxC; i++) {
+    if (m.notes[i] !== ":") idxP++;
   }
-  
-  const _notes = m.notes.replaceAll(':', '');
+
+  const _notes = m.notes.replaceAll(":", "");
 
   const len = _notes.length;
   const step = 64 / len;

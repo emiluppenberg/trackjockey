@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import { createMeasure, createPattern, type Measure } from "~/types2";
+import {
+  createMeasure,
+  createMeasures,
+  createPattern,
+  type Measure,
+} from "~/types2";
 
 const audioStore = useAudioStore();
 
@@ -10,14 +15,18 @@ function addPattern() {
   if (!audioStore.audioContext) return;
   if (!audioStore.tracker) return;
 
-  let measures: Measure[] = [];
+  let strings: string[] = [];
 
   for (let i = 0; i < audioStore.activeFigure.measureCount; i++) {
-    measures.push(createMeasure("0"));
+    strings.push("0-");
   }
 
   audioStore.activeFigure.patterns.push(
-    createPattern(audioStore.samples[0]!, measures, audioStore.audioContext)
+    createPattern(
+      audioStore.samples[0]!,
+      createMeasures(strings),
+      audioStore.audioContext
+    )
   );
 
   audioStore.reloadActiveFigureTracks();
@@ -34,9 +43,10 @@ function removePattern(idxP: number) {
 function addMeasure() {
   if (!audioStore.activeFigure) return;
 
+  const index = audioStore.activeFigure.measureCount;
   audioStore.activeFigure.measureCount++;
   audioStore.activeFigure.patterns.forEach((p) =>
-    p.measures.push(createMeasure("0"))
+    p.measures.push(createMeasure("0", index))
   );
 }
 

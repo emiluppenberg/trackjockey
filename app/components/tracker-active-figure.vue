@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { getCursorForVNotes, getMelodyIndex } from "~/types2";
+import { getCursorForVNotes, getMelodyIndex, type Pattern } from "~/types2";
 
 const audioStore = useAudioStore();
 const viewMode = ref<boolean>(false);
@@ -21,6 +21,13 @@ function checkNextMeasureIdxs(idxM: number): boolean {
   return (
     audioStore.activeTrack?.nextMeasureIdxs.some((i) => i === idxM) ?? false
   );
+}
+
+async function toggleMutePattern(p: Pattern) {
+  p.mute = !p.mute;
+
+  if (!p.mute) p.velocityNode.gain.value = 0;
+  if (p.mute) p.velocityNode.gain.value = 1;
 }
 </script>
 
@@ -45,11 +52,7 @@ function checkNextMeasureIdxs(idxM: number): boolean {
           v-for="(p, idxP) in audioStore.activeTrack?.figure?.patterns"
           class="h-[40px] text-center overflow-x-hidden overflow-y-hidden border-b border-white"
           :class="{ 'bg-green-600': !p.mute, 'bg-red-600': p.mute }"
-          @click="
-            () => {
-              p.mute = !p.mute;
-            }
-          "
+          @click="() => toggleMutePattern(p)"
         >
           {{ p.sample.name }}
         </button>
