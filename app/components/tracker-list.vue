@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { createMixer, type Track } from "~/types2";
+import { Track } from "~/types2";
 
 const audioStore = useAudioStore();
 const ctx = audioStore.ctx!;
@@ -22,6 +22,10 @@ function changeTracksLength(e: Event) {
 
     if (tracker.tracks.length > len) {
       for (let i = tracker.tracks.length; i > len; i--) {
+        const t = tracker.tracks[i - 1]!;
+
+        t.disconnect();
+        
         tracker.tracks.pop();
       }
     }
@@ -29,19 +33,13 @@ function changeTracksLength(e: Event) {
     if (tracker.tracks.length < len) {
       for (let i = tracker.tracks.length; i < len; i++) {
         // Make nicer
-        tracker.tracks.push({
-          figure: undefined,
-          mixer: createMixer(ctx!),
-          currentMeasure: 0,
-          nextMeasures: [],
-          mute: false
-        });
+        tracker.tracks.push(new Track(ctx));
       }
     }
   }
 }
 
-async function changeTrackFigure(e: KeyboardEvent, t: Track) {
+function changeTrackFigure(e: KeyboardEvent, t: Track) {
   if (e.code === "Tab") return;
 
   e.preventDefault();
@@ -54,13 +52,17 @@ async function changeTrackFigure(e: KeyboardEvent, t: Track) {
   const f = audioStore.figures.find((_f) => _f.keyBind === e.code);
 
   if (f) {
+    if (t.figure) {
+      t.figure.patterns.forEach((p) => p.velocityNode.disconnect());
+    }
+
     t.currentMeasure = 0;
-    t.figure = await f.clone(ctx);
-    await audioStore.mixerConnectTrack(t);
+    t.figure = f.clone(ctx);
+    t.connect(tracker);
   }
 }
 
-async function changeTrackNextFigure(e: KeyboardEvent, t: Track) {
+function changeTrackNextFigure(e: KeyboardEvent, t: Track) {
   if (e.code === "Tab") return;
 
   e.preventDefault();
@@ -73,7 +75,7 @@ async function changeTrackNextFigure(e: KeyboardEvent, t: Track) {
   const f = audioStore.figures.find((_f) => _f.keyBind === e.code);
 
   if (f) {
-    t.nextFigure = await f.clone(ctx);
+    t.nextFigure = f.clone(ctx);
   }
 }
 
@@ -96,7 +98,7 @@ function pushTracksNextFigure() {
     t.currentMeasure = 0;
     t.figure = t.nextFigure;
     t.nextFigure = undefined;
-    audioStore.mixerConnectTrack(t);
+    t.connect(tracker);
   }
 }
 </script>

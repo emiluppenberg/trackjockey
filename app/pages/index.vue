@@ -4,7 +4,7 @@ const audioStore = useAudioStore();
 
 <template>
   <div class="flex flex-col w-screen h-auto overflow-y-scroll">
-    <button class="w-full border my-1" @click="audioStore.logLog">
+    <button class="w-full border my-1" @click="audioStore.consoleLog">
       Log
     </button>
     <Tracker

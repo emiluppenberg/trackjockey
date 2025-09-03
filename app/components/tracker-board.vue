@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { type Figure, type Sample } from "~/types2";
+import { type Figure } from "~/types2";
 
 const audioStore = useAudioStore();
 const figures = audioStore.figures;

@@ -1,12 +1,10 @@
 import {
   Pattern,
   type Mixer,
-  type Tracker,
-  createMixer,
   Figure,
   Sample,
+  Tracker,
   type Track,
-  type Measure,
   type Note,
 } from "~/types2";
 
@@ -48,19 +46,7 @@ export const useAudioStore = defineStore("audioStore", () => {
     eqAnalyser.value = ctx.value.createAnalyser();
     compAnalyser.value = ctx.value.createAnalyser();
 
-    tracker.value = {
-      bpm: 120,
-      tracks: [
-        {
-          figure: undefined,
-          mixer: createMixer(ctx.value),
-          currentMeasure: 0,
-          nextMeasures: [],
-          mute: false,
-        },
-      ],
-      master: createMixer(ctx.value),
-    };
+    tracker.value = new Tracker(120, ctx.value);
 
     activeMixer.value = tracker.value.tracks[0]!.mixer;
     activeTrack.value = tracker.value.tracks[0]!;
@@ -92,19 +78,18 @@ export const useAudioStore = defineStore("audioStore", () => {
     }
   );
 
-  function getGain(): GainNode {
-    return velPool.value!.pop() || ctx.value!.createGain();
-  }
-
-  function recycle(velNode: GainNode, srcNode: AudioBufferSourceNode) {
+  function recycle(
+    velNode: GainNode,
+    srcNode: AudioBufferSourceNode,
+    p_srcNodes: Set<AudioBufferSourceNode>
+  ) {
     try {
       velNode.disconnect();
       srcNode.disconnect();
-    } catch (e) {
-      console.log(e);
+      if (p_srcNodes.has(srcNode)) p_srcNodes.delete(srcNode);
+    } catch(e) {
+      console.log("error ", e);
     }
-
-    velPool.value!.push(velNode);
   }
 
   async function startTracker() {
@@ -119,57 +104,26 @@ export const useAudioStore = defineStore("audioStore", () => {
     });
 
     isPlaying.value = true;
-    let noteLen = 60 / tracker.value!.bpm / 16;
     let nextNoteTime = ctx.value!.currentTime;
     const scheduleAhead = 0.2; // s
-
+    
     const loop = async () => {
       if (!isPlaying.value) return;
 
-      const loopStart = performance.now();
-      let cycleCount = 0;
+      let noteLen = 60 / tracker.value!.bpm / 16;
 
       while (nextNoteTime < ctx.value!.currentTime + scheduleAhead) {
         const cycleStart = nextNoteTime;
-
-        // const proccesingStart = performance.now();
-
         for (const t of tracker.value!.tracks) {
           if (!t.figure) continue;
           if (t.mute) continue;
           cycleTrackPatterns(t, noteLen, cycleStart);
-          cycleCount++;
         }
-
-        // console.log(
-        //   "cycle: ",
-        //   (performance.now() - proccesingStart).toFixed(2),
-        //   processedStop1.value,
-        //   processedStop2.value,
-        //   processedStop3.value
-        // );
-        // processedStop1.value = 0;
-        // processedStop2.value = 0;
-        // processedStop3.value = 0;
 
         nextNoteTime += noteLen;
         cursor.value++;
         if (cursor.value === 64) cursor.value = 0;
       }
-
-      // log.value = log.value.concat(
-      //   `loop: ${(performance.now() - loopStart).toFixed(2)} - cycles: ${cycleCount}\n`
-      // );
-
-      // const logString =
-      //   "cycles: " +
-      //   cycleCount +
-      //   " " +
-      //   processedStop1.value +
-      //   " " +
-      //   processedStop2.value +
-      //   " " +
-      //   processedStop3.value;
 
       // log.value = log.value.concat(`${logString}\n`);
 
@@ -182,8 +136,7 @@ export const useAudioStore = defineStore("audioStore", () => {
   function cycleTrackPatterns(t: Track, noteLen: number, cycleStart: number) {
     for (const p of t.figure!.patterns) {
       if (p.currentMeasure !== t.currentMeasure) continue;
-      if (t.currentMeasure >= t.figure!.measureCount)
-        t.currentMeasure = 0;
+      if (t.currentMeasure >= t.figure!.measureCount) t.currentMeasure = 0;
 
       const _currentMeasure = p.currentMeasure;
       const _currentPos = p.currentPos;
@@ -228,7 +181,7 @@ export const useAudioStore = defineStore("audioStore", () => {
     const velocity = (note.velocity * 2) / 10;
     const pitch = note.pitch * 100;
 
-    const velNode = getGain();
+    const velNode = ctx.value!.createGain();
     const srcNode = ctx.value!.createBufferSource();
     srcNode.buffer = p.sample.audioBuffer;
     srcNode.detune.value = pitch;
@@ -238,7 +191,8 @@ export const useAudioStore = defineStore("audioStore", () => {
     srcNode.start(startTime);
     srcNode.stop(stopTime);
 
-    srcNode.onended = () => recycle(velNode, srcNode);
+    p.srcNodes.add(srcNode);
+    srcNode.onended = () => recycle(velNode, srcNode, p.srcNodes);
 
     p.currentPos++;
     if (p.currentPos === p.notePos[_currentMeasure]!.length) {
@@ -306,9 +260,7 @@ export const useAudioStore = defineStore("audioStore", () => {
     for (let i = 0; i < wavs.length; i++) {
       const sample = await fetch(wavs[i]!)
         .then((response) => response.arrayBuffer())
-        .then(
-          (arrayBuffer) => ctx.value!.decodeAudioData(arrayBuffer)!
-        );
+        .then((arrayBuffer) => ctx.value!.decodeAudioData(arrayBuffer)!);
 
       const fileName = wavs[i]!.split("/").pop()!;
 
@@ -387,42 +339,6 @@ export const useAudioStore = defineStore("audioStore", () => {
     activeFigure.value = figures.value[0];
   }
 
-  async function mixerConnect(mixer: Mixer) {
-    let lastNode: AudioNode = mixer.pannerNode; // Default audio flow : pannerNode -> pitcherNode? -> ... -> gainNode -> parent
-    lastNode = lastNode.connect(mixer.pitcherNode);
-
-    if (mixer.filterNodes.length > 0) {
-      lastNode.disconnect();
-      lastNode = lastNode.connect(mixer.filterNodes[0]!);
-
-      for (const f of mixer.filterNodes) {
-        const idx = mixer.filterNodes.indexOf(f);
-
-        if (mixer.filterNodes[idx + 1]) {
-          lastNode.disconnect();
-          lastNode = lastNode.connect(mixer.filterNodes[idx + 1]!);
-        }
-      }
-    }
-
-    lastNode.disconnect();
-    lastNode = lastNode.connect(mixer.compressorNode).connect(mixer.gainNode);
-  }
-
-  async function mixerConnectTrack(t: Track) {
-    if (!t.figure) return;
-
-    mixerConnect(t.mixer);
-    t.mixer.gainNode.disconnect();
-    t.mixer.gainNode.connect(tracker.value!.master.pannerNode);
-
-    for (const p of t.figure.patterns) {
-      p.velocityNode.disconnect();
-      p.velocityNode.gain.value = 1;
-      p.velocityNode.connect(t.mixer.pannerNode);
-    }
-  }
-
   function mixerConnectEqAnalyser() {
     eqAnalyser.value = ctx.value!.createAnalyser();
     eqAnalyser.value.fftSize = eq_fftSize;
@@ -445,14 +361,17 @@ export const useAudioStore = defineStore("audioStore", () => {
     if (fTracks.length > 0) {
       for (const t of fTracks) {
         t.figure = activeFigure.value!.clone(ctx.value!);
-        mixerConnectTrack(t);
+        t.connect(tracker.value!);
       }
     }
   }
 
-  function logLog() {
-    console.log(log.value);
-    log.value = "";
+  function consoleLog() {
+    tracker.value!.tracks.forEach((t) =>
+      console.log(t.figure?.patterns.map((p) => p.srcNodes))
+    );
+
+    console.log(ctx.value?.currentTime, ctx.value?.state);
   }
 
   return {
@@ -474,12 +393,10 @@ export const useAudioStore = defineStore("audioStore", () => {
     log,
     startTracker,
     stopTracker,
-    mixerConnect,
-    mixerConnectTrack,
     mixerConnectEqAnalyser,
     mixerConnectCompAnalyser,
     loadFigures,
     reloadActiveFigureTracks,
-    logLog,
+    consoleLog,
   };
 });

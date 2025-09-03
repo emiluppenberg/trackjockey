@@ -1,7 +1,5 @@
 <script setup lang="ts">
 const audioStore = useAudioStore();
-const ctx = audioStore.ctx!;
-const comp = audioStore.activeMixer!.compressorNode!;
 
 const cCanvas = ref<HTMLCanvasElement>();
 const aCanvas = ref<HTMLCanvasElement>();
@@ -25,6 +23,7 @@ onMounted(() => {
 function drawCompressor(outputY: number) {
   if (!cCanvas.value) return;
 
+  const comp = audioStore.activeMixer!.compressorNode!;
   const w = cCanvas.value.width;
   const h = cCanvas.value.height;
 
@@ -79,12 +78,13 @@ function drawCompressor(outputY: number) {
   }
 }
 
-async function drawAudio() {
+function drawAudio() {
   if (!aCanvas.value) return;
   if (audioStore.isPlaying) {
     const id = requestAnimationFrame(drawAudio);
   }
 
+  const comp = audioStore.activeMixer!.compressorNode!;
   const w = aCanvas.value.width;
   const h = aCanvas.value.height;
 

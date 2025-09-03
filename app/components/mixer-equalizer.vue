@@ -70,12 +70,12 @@ function addFilter() {
   filter.type = "lowpass"; // Default
 
   audioStore.activeMixer!.filterNodes.push(filter);
-  audioStore.mixerConnect(audioStore.activeMixer!);
+  audioStore.activeMixer!.connect();
 }
 
 function removeFilter(idxF: number) {
   audioStore.activeMixer!.filterNodes.splice(idxF, 1);
-  audioStore.mixerConnect(audioStore.activeMixer!);
+  audioStore.activeMixer!.connect();
 }
 
 function drawAudio() {

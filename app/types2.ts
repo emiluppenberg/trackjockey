@@ -29,7 +29,8 @@ export class Figure {
     public keyBind: string = "",
     public patterns: Pattern[] = []
   ) {
-    this.measureCount = Math.max(...patterns.map((p) => p.measures.length)) || 0;
+    this.measureCount =
+      Math.max(...patterns.map((p) => p.measures.length)) || 0;
   }
 
   clone(ctx: AudioContext): Figure {
@@ -51,7 +52,7 @@ export class Pattern {
     public notePos: Note[][] = [],
     public currentMeasure: number = 0,
     public currentPos: number = 0,
-    public srcNodes: AudioBufferSourceNode[] = []
+    public srcNodes: Set<AudioBufferSourceNode> = new Set()
   ) {}
 
   clone(ctx: AudioContext): Pattern {
@@ -63,11 +64,7 @@ export class Pattern {
       this.notePos,
       0,
       0,
-      this.srcNodes.map((sn) => {
-        const newSn = ctx.createBufferSource();
-        newSn.buffer = cloneAudioBuffer(this.sample.audioBuffer, ctx);
-        return newSn;
-      })
+      new Set()
     );
   }
 
@@ -79,6 +76,11 @@ export class Pattern {
   insertMeasure(notes: string, idx: number) {
     this.measures.splice(idx, 1, new Measure(notes));
     this.notePos.splice(idx, 1, initializeNotes64(notes));
+  }
+
+  disconnect() {
+    this.srcNodes.forEach((s) => s.disconnect());
+    this.velocityNode.disconnect();
   }
 }
 
@@ -102,29 +104,109 @@ export class Measure {
   }
 }
 
-export type Tracker = {
+export class Tracker {
   bpm: number;
   tracks: Track[];
   master: Mixer;
-};
 
-export type Track = {
+  constructor(bpm: number, ctx: AudioContext) {
+    this.bpm = bpm;
+    this.tracks = [new Track(ctx)];
+    this.master = new Mixer(ctx);
+  }
+}
+
+export class Track {
   figure?: Figure;
   nextFigure?: Figure;
-  currentMeasure: number;
-  nextMeasures: number[];
   mixer: Mixer;
-  mute: boolean;
-};
 
-export type Mixer = {
+  constructor(
+    public ctx: AudioContext,
+    public mute: boolean = false,
+    public currentMeasure: number = 0,
+    public nextMeasures: number[] = []
+  ) {
+    this.mixer = new Mixer(ctx);
+  }
+
+  connect(tracker: Tracker) {
+    if (!this.figure) return;
+
+    this.mixer.connect();
+    this.mixer.gainNode.disconnect();
+    this.mixer.gainNode.connect(tracker.master.pannerNode);
+
+    for (const p of this.figure.patterns) {
+      p.velocityNode.disconnect();
+      p.velocityNode.gain.value = 1;
+      p.velocityNode.connect(this.mixer.pannerNode);
+    }
+  }
+
+  disconnect() {
+    this.mixer.disconnect();
+
+    if (this.figure) {
+      this.figure.patterns.forEach((p) => p.velocityNode.disconnect());
+    }
+  }
+}
+
+export class Mixer {
   pitcherNode: AudioWorkletNode;
   pitch: number;
   pannerNode: StereoPannerNode;
   gainNode: GainNode;
   filterNodes: BiquadFilterNode[];
   compressorNode: DynamicsCompressorNode;
-};
+  constructor(ctx: AudioContext) {
+    this.pitcherNode = new AudioWorkletNode(ctx, "pitch-processor");
+    this.pitch = 0;
+    this.pannerNode = ctx.createStereoPanner();
+    this.gainNode = ctx.createGain();
+    this.filterNodes = [];
+    this.compressorNode = ctx.createDynamicsCompressor();
+    this.compressorNode.attack.value = 0.05;
+    this.compressorNode.knee.value = 0;
+    this.compressorNode.ratio.value = 1;
+    this.compressorNode.threshold.value = 0;
+  }
+
+  connect() {
+    let lastNode: AudioNode = this.pannerNode; // Default audio flow : pannerNode -> pitcherNode? -> ... -> gainNode -> parent
+    lastNode = lastNode.connect(this.pitcherNode);
+
+    if (this.filterNodes.length > 0) {
+      lastNode.disconnect();
+      lastNode = lastNode.connect(this.filterNodes[0]!);
+
+      for (const f of this.filterNodes) {
+        const idx = this.filterNodes.indexOf(f);
+
+        if (this.filterNodes[idx + 1]) {
+          lastNode.disconnect();
+          lastNode = lastNode.connect(this.filterNodes[idx + 1]!);
+        }
+      }
+    }
+
+    lastNode.disconnect();
+    lastNode = lastNode.connect(this.compressorNode).connect(this.gainNode);
+  }
+
+  disconnect() {
+    this.pannerNode.disconnect(); // Default audio flow : pannerNode -> pitcherNode? -> ... -> gainNode -> parent
+    this.pitcherNode.disconnect();
+
+    if (this.filterNodes.length > 0) {
+      this.filterNodes.forEach((f) => f.disconnect());
+    }
+
+    this.compressorNode.disconnect();
+    this.gainNode.disconnect();
+  }
+}
 
 export function cloneAudioBuffer(
   audioBuffer: AudioBuffer,
@@ -140,23 +222,6 @@ export function cloneAudioBuffer(
   }
 
   return clone;
-}
-
-export function createMixer(audioContext: AudioContext): Mixer {
-  const compressorNode = audioContext.createDynamicsCompressor();
-  compressorNode.attack.value = 0.05;
-  compressorNode.knee.value = 0;
-  compressorNode.ratio.value = 1;
-  compressorNode.threshold.value = 0;
-
-  return {
-    gainNode: audioContext.createGain(),
-    pannerNode: audioContext.createStereoPanner(),
-    pitch: 0,
-    pitcherNode: new AudioWorkletNode(audioContext, "pitch-processor"),
-    filterNodes: [],
-    compressorNode: compressorNode,
-  };
 }
 
 export function initializeNotes64(notes: string): Note[] {
