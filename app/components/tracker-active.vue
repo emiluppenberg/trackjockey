@@ -1,8 +1,6 @@
 <script setup lang="ts">
-import { cloneFigure, selectAllText, type Measure, type Track } from "~/types2";
 const audioStore = useAudioStore();
-const audioContext = audioStore.audioContext!;
-const tracker = audioStore.tracker!;
+const ctx = audioStore.ctx!;
 const tracks = audioStore.tracker!.tracks;
 const figures = audioStore.figures;
 
@@ -60,27 +58,22 @@ function focusActiveInput(e: KeyboardEvent) {
 
 async function changeActiveTrackFigure(e: KeyboardEvent) {
   if (e.code === "Tab") return;
-  if (!audioStore.activeTrack) return;
 
   e.preventDefault();
 
   if (e.code === "KeyQ") {
-    audioStore.activeTrack.figure = undefined;
+    audioStore.activeTrack!.mute = !audioStore.activeTrack!.mute;
+    console.log('mute');
     return;
   }
 
   const f = figures.find((_f) => _f.keyBind === e.code);
 
   if (f) {
-    audioStore.activeTrack.figure = cloneFigure(f, audioContext);
-    await audioStore.mixerConnectTrack(audioStore.activeTrack);
+    console.log(f);
+    audioStore.activeTrack!.figure = f.clone(ctx);
+    await audioStore.mixerConnectTrack(audioStore.activeTrack!);
   }
-}
-
-function toggleActiveTrackMix() {
-  if (!audioStore.activeTrack) return;
-
-  audioStore.activeMixer = audioStore.activeTrack.mixer;
 }
 
 onMounted(() => {
@@ -104,7 +97,7 @@ onMounted(() => {
     <button
       id="active-mix"
       class="w-[950px] text-white text-3xl bg-indigo-700 focus:bg-indigo-400"
-      @click="toggleActiveTrackMix"
+      @click="() => (audioStore.activeMixer = audioStore.activeTrack!.mixer)"
     >
       MIX
     </button>

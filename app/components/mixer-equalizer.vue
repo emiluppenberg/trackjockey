@@ -2,7 +2,7 @@
 import { melToX, xToHz } from "~/types2";
 
 const audioStore = useAudioStore();
-const audioContext = audioStore.audioContext!;
+const ctx = audioStore.ctx!;
 const fCanvas = ref<HTMLCanvasElement>();
 const aCanvas = ref<HTMLCanvasElement>();
 
@@ -34,7 +34,6 @@ function initFreqHz() {
 
 function drawFilter(f: BiquadFilterNode) {
   if (!fCanvas.value) return;
-  if (!audioStore.activeMixer) return;
 
   const canCtx = fCanvas.value.getContext("2d")!;
   const w = fCanvas.value.width;
@@ -66,25 +65,20 @@ function drawFilter(f: BiquadFilterNode) {
 }
 
 function addFilter() {
-  if (!audioStore.activeMixer) return;
-
-  const filter = audioContext.createBiquadFilter();
+  const filter = ctx.createBiquadFilter();
   filter.frequency.value = 24000; // Default
   filter.type = "lowpass"; // Default
 
-  audioStore.activeMixer.filterNodes.push(filter);
-  audioStore.mixerConnect(audioStore.activeMixer);
+  audioStore.activeMixer!.filterNodes.push(filter);
+  audioStore.mixerConnect(audioStore.activeMixer!);
 }
 
 function removeFilter(idxF: number) {
-  if (!audioStore.activeMixer) return;
-
-  audioStore.activeMixer.filterNodes.splice(idxF, 1);
-  audioStore.mixerConnect(audioStore.activeMixer);
+  audioStore.activeMixer!.filterNodes.splice(idxF, 1);
+  audioStore.mixerConnect(audioStore.activeMixer!);
 }
 
 function drawAudio() {
-  if (!audioStore.eqAnalyser) return;
   if (!aCanvas.value) return;
   if (audioStore.isPlaying) {
     const id = requestAnimationFrame(drawAudio);
@@ -93,7 +87,7 @@ function drawAudio() {
   const w = aCanvas.value.width;
   const h = aCanvas.value.height;
 
-  audioStore.eqAnalyser.getByteTimeDomainData(array);
+  audioStore.eqAnalyser!.getByteTimeDomainData(array);
 
   const canCtx = aCanvas.value.getContext("2d")!;
   canCtx.clearRect(0, 0, w, h);

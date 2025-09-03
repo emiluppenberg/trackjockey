@@ -39,11 +39,7 @@ onMounted(() => {
   <!-- Tracker.vue -->
   <div class="flex flex-col w-[1900px] h-auto bg-sky-800 border">
     <TrackerBoard class="h-auto"></TrackerBoard>
-    <TrackerList
-      v-if="audioStore.audioContext && audioStore.tracker"
-    ></TrackerList>
-    <TrackerActiveFigure
-      class="h-auto"
-    ></TrackerActiveFigure>
+    <TrackerList></TrackerList>
+    <TrackerActiveFigure class="h-auto"></TrackerActiveFigure>
   </div>
 </template>

@@ -1,16 +1,15 @@
 <script setup lang="ts">
 const audioStore = useAudioStore();
-const audioContext = audioStore.audioContext!;
+const ctx = audioStore.ctx!;
 const tracker = audioStore.tracker!;
 
 function inputPitch(e: Event) {
   e.preventDefault();
-  if (!audioStore.activeMixer) return;
 
   const element = e.target as HTMLInputElement;
-  audioStore.activeMixer.pitch = Number(element.value);
-  audioStore.activeMixer.pitcherNode.parameters.get("pitch")!.value =
-    audioStore.activeMixer.pitch;
+  audioStore.activeMixer!.pitch = Number(element.value);
+  audioStore.activeMixer!.pitcherNode.parameters.get("pitch")!.value =
+    audioStore.activeMixer!.pitch;
 }
 </script>
 
@@ -46,6 +45,6 @@ function inputPitch(e: Event) {
     <!-- EQ -->
     <MixerEqualizer v-if="audioStore.eqAnalyser"></MixerEqualizer>
     <!-- Compressor -->
-    <MixerCompressor></MixerCompressor>
+    <MixerCompressor v-if="audioStore.compAnalyser"></MixerCompressor>
   </div>
 </template>

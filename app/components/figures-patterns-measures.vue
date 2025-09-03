@@ -1,9 +1,5 @@
 <script setup lang="ts">
-import {
-  type Measure,
-  getPitchIndex,
-  initializeNotes64,
-} from "~/types2";
+import { type Measure, Pattern, initializeNotes64 } from "~/types2";
 const props = defineProps<{ editMode: boolean }>();
 const audioStore = useAudioStore();
 
@@ -21,20 +17,9 @@ function handleEditMeasureRhythm(idxP: number, idxMc: number, m: Measure) {
   }
 }
 
-function inputMeasureNotation(e: Event, m: Measure) {
+function inputMeasureNotation(e: Event, p: Pattern, idxM: number) {
   const notes = (e.target as HTMLInputElement).value.toUpperCase();
-  let _notes: string = "";
-
-  for (let i = 0; i < notes.length; i++) {
-    const c = notes.charAt(i);
-
-    if (Number(c) || c === '-' || c === ':' || c === '0') _notes += c;
-    else alert('invalid note input'); 
-    }
-  
-  m.notes = _notes;
-  m.velocity64 = initializeNotes64(_notes);
-  m.pitch64 = initializeNotes64(_notes);
+  p.insertMeasure(notes, idxM);
 }
 </script>
 
@@ -58,65 +43,60 @@ function inputMeasureNotation(e: Event, m: Measure) {
           :key="idxM"
           class="min-w-[400px] max-w-[400px] h-full flex"
         >
-            <!-- Measure -->
+          <!-- Measure -->
+          <div class="w-full flex flex-col border-r border-cyan-400">
+            <!-- Textarea/Hidden -->
+            <textarea
+              :id="`pattern-${idxP}-measure-${idxM}-rhythm-textarea`"
+              type="text"
+              class="w-full field-sizing-content text-center text-xl content-center bg-black text-white"
+              rows="1"
+              :class="{ hidden: editMeasure !== m }"
+              :value="m.notes"
+              @change="(e) => inputMeasureNotation(e, p, idxM)"
+              @focusout="editMeasure = undefined"
+              wrap="soft"
+            ></textarea>
+            <!-- Velocity -->
             <div
-              class="w-full flex flex-col border-r border-cyan-400"
+              class="flex w-full h-full border-b border-cyan-400 items-start"
+              :class="{ hidden: editMeasure === m || editMode }"
             >
-              <!-- Textarea/Hidden -->
-              <textarea
-                :id="`pattern-${idxP}-measure-${idxM}-rhythm-textarea`"
-                type="text"
-                class="w-full field-sizing-content text-center text-xl content-center bg-black text-white"
-                rows="1"
-                :class="{ hidden: editMeasure !== m }"
-                :value="m.notes"
-                @change="(e) => inputMeasureNotation(e, m)"
-                @focusout="editMeasure = undefined"
-                wrap="soft"
-              ></textarea>
-              <!-- Velocity -->
               <div
-                class="flex w-full h-full border-b border-cyan-400 items-start"
-                :class="{ hidden: editMeasure === m || editMode }"
+                tabindex="0"
+                class="w-full h-full flex items-center justify-evenly text-2xl"
+                @focus="handleEditMeasureRhythm(idxP, idxM, m)"
               >
-                <div
-                  tabindex="0"
-                  class="w-full h-full flex items-center justify-evenly text-2xl"
-                  @focus="handleEditMeasureRhythm(idxP, idxM, m)"
-                >
-                  <div
-                    v-for="(c, idxC) in m.notes"
-                    class="text-center w-[2em]"
-                  >
-                    {{ c }}
-                  </div>
+                <div v-for="(c, idxC) in m.notes" class="text-center w-[2em]">
+                  {{ c }}
                 </div>
               </div>
-              <!-- Melody -->
-              <div
-                class="flex w-full h-full border-b border-cyan-400 bg-sky-900"
-                :class="{ hidden: !editMode }"
-              >
-                <div class="w-full h-full flex justify-between text-xl">
+            </div>
+            <!-- Melody -->
+            <div
+              class="flex w-full h-full border-b border-cyan-400 bg-sky-900"
+              :class="{ hidden: !editMode }"
+            >
+              <div class="w-full h-full flex justify-between text-xl">
                   <div
                     v-for="(c, idxC) in m.notes"
                     class="w-[2em] h-1/2 place-self-center select-none"
                   >
                     <!-- Value -->
                     <div
-                      v-if="Number(c) && getPitchIndex(idxC, m)"
+                      v-if="Number(c)"
                       class="relative w-full h-full flex justify-center"
                     >
                       <input
                         tabindex="0"
                         type="number"
                         class="opacity-0 absolute inset-0 peer"
-                        v-model="getPitchIndex(idxC, m)!.value"
+                        v-model="p.notePos[idxM]![m.formatPos.findIndex(fp => fp === idxC)]"
                       />
                       <div
                         class="flex italic text-xs text-center justify-center border-l border-cyan-400 peer-focus:ring-0 peer-focus:bg-lime-700 peer-focus:text-lime-200"
                       >
-                        {{ getPitchIndex(idxC, m)!.value }}
+                        {{ c }}
                       </div>
                     </div>
                     <!-- NonValue -->
@@ -127,9 +107,9 @@ function inputMeasureNotation(e: Event, m: Measure) {
                       <div class="text-xs text-center">{{ c }}</div>
                     </div>
                   </div>
-                </div>
               </div>
             </div>
+          </div>
         </div>
       </div>
     </div>

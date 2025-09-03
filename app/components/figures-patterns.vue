@@ -1,53 +1,33 @@
 <script setup lang="ts">
-import {
-  createMeasure,
-  createMeasures,
-  createPattern,
-  type Measure,
-} from "~/types2";
+import { Pattern } from "~/types2";
 
 const audioStore = useAudioStore();
+const ctx = audioStore.ctx!;
 
 const editMode = ref<boolean>(false);
 
 function addPattern() {
-  if (!audioStore.activeFigure) return;
-  if (!audioStore.audioContext) return;
-  if (!audioStore.tracker) return;
+  const pattern = new Pattern(audioStore.samples[0]!, ctx.createGain());
 
-  let strings: string[] = [];
-
-  for (let i = 0; i < audioStore.activeFigure.measureCount; i++) {
-    strings.push("0-");
+  for (let i = 0; i < audioStore.activeFigure!.measureCount; i++) {
+    pattern.addMeasure("0-");
   }
 
-  audioStore.activeFigure.patterns.push(
-    createPattern(
-      audioStore.samples[0]!,
-      createMeasures(strings),
-      audioStore.audioContext
-    )
-  );
+  audioStore.activeFigure!.patterns.push(pattern);
 
   audioStore.reloadActiveFigureTracks();
 }
 
 function removePattern(idxP: number) {
-  if (!audioStore.activeFigure) return;
-
-  audioStore.activeFigure.patterns.splice(idxP, 1);
+  audioStore.activeFigure!.patterns.splice(idxP, 1);
 
   audioStore.reloadActiveFigureTracks();
 }
 
 function addMeasure() {
-  if (!audioStore.activeFigure) return;
-
-  const index = audioStore.activeFigure.measureCount;
-  audioStore.activeFigure.measureCount++;
-  audioStore.activeFigure.patterns.forEach((p) =>
-    p.measures.push(createMeasure("0", index))
-  );
+  const index = audioStore.activeFigure!.measureCount;
+  audioStore.activeFigure!.measureCount++;
+  audioStore.activeFigure!.patterns.forEach((p) => p.addMeasure("0-"));
 }
 
 function removeMeasure() {

@@ -1,41 +1,106 @@
-export type Measure = {
-  notes: string;
-  pitch64: Note[];
-  velocity64: Note[];
-  idx64: number;
-  index: number;
-};
-
 export type Note = {
-  value: number;
+  velocity: number;
+  pitch: number;
   pos64: number;
 };
 
-export type Sample = {
-  audioBuffer: AudioBuffer;
-  fileName?: string;
-  name: string;
-  keyBind?: string;
-};
+export class Sample {
+  constructor(
+    public audioBuffer: AudioBuffer,
+    public fileName: string,
+    public name: string
+  ) {}
 
-export type Figure = {
-  id: number;
-  name: string;
-  measureCount: number;
-  keyBind?: string;
-  patterns: Pattern[];
-};
+  clone(ctx: AudioContext): Sample {
+    return new Sample(
+      cloneAudioBuffer(this.audioBuffer, ctx),
+      this.fileName,
+      this.name
+    );
+  }
+}
 
-export type Pattern = {
-  mute: boolean;
-  sample: Sample;
-  measures: Measure[];
-  notePos: number[][];
-  currentMeasure: number;
-  currentPos: number;
-  srcNodes: AudioBufferSourceNode[];
-  velocityNode: GainNode;
-};
+export class Figure {
+  public measureCount: number;
+
+  constructor(
+    public id: number = 0,
+    public name: string = "undefined",
+    public keyBind: string = "",
+    public patterns: Pattern[] = []
+  ) {
+    this.measureCount = Math.max(...patterns.map((p) => p.measures.length)) || 0;
+  }
+
+  clone(ctx: AudioContext): Figure {
+    return new Figure(
+      this.id,
+      this.name,
+      this.keyBind,
+      this.patterns.map((p) => p.clone(ctx))
+    );
+  }
+}
+
+export class Pattern {
+  constructor(
+    public sample: Sample,
+    public velocityNode: GainNode,
+    public mute: boolean = false,
+    public measures: Measure[] = [],
+    public notePos: Note[][] = [],
+    public currentMeasure: number = 0,
+    public currentPos: number = 0,
+    public srcNodes: AudioBufferSourceNode[] = []
+  ) {}
+
+  clone(ctx: AudioContext): Pattern {
+    return new Pattern(
+      this.sample.clone(ctx),
+      ctx.createGain(),
+      this.mute,
+      this.measures,
+      this.notePos,
+      0,
+      0,
+      this.srcNodes.map((sn) => {
+        const newSn = ctx.createBufferSource();
+        newSn.buffer = cloneAudioBuffer(this.sample.audioBuffer, ctx);
+        return newSn;
+      })
+    );
+  }
+
+  addMeasure(notes: string) {
+    this.measures.push(new Measure(notes));
+    this.notePos.push(initializeNotes64(notes));
+  }
+
+  insertMeasure(notes: string, idx: number) {
+    this.measures.splice(idx, 1, new Measure(notes));
+    this.notePos.splice(idx, 1, initializeNotes64(notes));
+  }
+}
+
+export class Measure {
+  formatPos: number[]; // Contains the indices of notes[i] with a value - same length as patterns[x].notePos[i][j]
+  notes: string;
+
+  constructor(notes: string) {
+    let formatPos: number[] = [];
+
+    for (let i = 0; i < notes.length; i++) {
+      const c = notes.charAt(i);
+
+      if (!isNaN(Number(c))) {
+        formatPos.push(i);
+      }
+    }
+
+    this.notes = notes;
+    this.formatPos = formatPos;
+  }
+}
 
 export type Tracker = {
   bpm: number;
@@ -46,9 +111,10 @@ export type Tracker = {
 export type Track = {
   figure?: Figure;
   nextFigure?: Figure;
-  currentMeasureIdx: number;
-  nextMeasureIdxs: number[];
+  currentMeasure: number;
+  nextMeasures: number[];
   mixer: Mixer;
+  mute: boolean;
 };
 
 export type Mixer = {
@@ -59,45 +125,6 @@ export type Mixer = {
   filterNodes: BiquadFilterNode[];
   compressorNode: DynamicsCompressorNode;
 };
-
-export function cloneFigure(f: Figure, audioContext: AudioContext): Figure {
-  return {
-    ...f,
-    patterns: f.patterns.map((p) => clonePattern(p, audioContext)),
-  };
-}
-
-export function clonePattern(p: Pattern, audioContext: AudioContext): Pattern {
-  return {
-    ...p,
-    sample: cloneSample(p.sample, audioContext),
-    measures: p.measures.map((m) => cloneMeasure(m, p.sample, audioContext)),
-    velocityNode: audioContext.createGain(),
-    srcNodes: p.srcNodes.map((sn) => {
-      const newSn = audioContext.createBufferSource();
-      newSn.buffer = cloneAudioBuffer(p.sample.audioBuffer, audioContext);
-      return newSn;
-    }),
-  };
-}
-
-export function cloneMeasure(
-  m: Measure,
-  s: Sample,
-  audioContext: AudioContext
-) {
-  return {
-    ...m,
-  };
-}
-
-export function cloneSample(s: Sample, audioContext: AudioContext) {
-  return {
-    ...s,
-    audioBuffer: cloneAudioBuffer(s.audioBuffer, audioContext),
-    velocityNode: audioContext.createGain(),
-  };
-}
 
 export function cloneAudioBuffer(
   audioBuffer: AudioBuffer,
@@ -132,76 +159,6 @@ export function createMixer(audioContext: AudioContext): Mixer {
   };
 }
 
-export function createSample(
-  audioBuffer: AudioBuffer,
-  name: string,
-  fileName?: string
-): Sample {
-  return {
-    audioBuffer: audioBuffer,
-    name: name,
-    fileName: fileName,
-  };
-}
-
-export function createMeasures(array: string[]): Measure[] {
-  let measures: Measure[] = [];
-
-  for (let i = 0; i < array.length; i++) {
-    measures.push({
-      notes: array[i]!,
-      velocity64: initializeNotes64(array[i]!),
-      pitch64: initializeNotes64(array[i]!),
-      idx64: 0,
-      index: i,
-    });
-  }
-
-  return measures;
-}
-
-export function createMeasure(notes: string, index: number): Measure {
-  return {
-    notes: notes,
-    velocity64: initializeNotes64(notes),
-    pitch64: initializeNotes64(notes),
-    idx64: 0,
-    index: index,
-  };
-}
-
-export function createPattern(
-  sample: Sample,
-  measures: Measure[],
-  audioContext: AudioContext
-): Pattern {
-  return {
-    mute: false,
-    sample: sample,
-    measures: measures,
-    velocityNode: audioContext.createGain(),
-    srcNodes: [],
-    currentMeasure: 0,
-    currentPos: 0,
-    notePos: measures.map((m, i) => m.velocity64.map((v, j) => j)),
-  };
-}
-
-export function createFigure(
-  id: number,
-  name: string,
-  keyBind: string,
-  patterns: Pattern[]
-): Figure {
-  return {
-    id: id,
-    name: name,
-    measureCount: patterns[0]!.measures.length,
-    keyBind: keyBind,
-    patterns: patterns,
-  };
-}
-
 export function initializeNotes64(notes: string): Note[] {
   const _notes = notes.replaceAll(":", "");
   const len = _notes.length;
@@ -213,7 +170,7 @@ export function initializeNotes64(notes: string): Note[] {
     const c = _notes.charAt(i);
 
     if (!isNaN(Number(c))) {
-      notes64.push({ value: Number(c), pos64: idx });
+      notes64.push({ velocity: Number(c), pitch: 0, pos64: idx });
     }
 
     idx += step;
@@ -222,79 +179,75 @@ export function initializeNotes64(notes: string): Note[] {
   return notes64;
 }
 
-export function getPitchIndex(idxC: number, m: Measure): Note {
-  let idxP = 0;
+// export function getPitchIndex(idxC: number, m: string): Note {
+//   let idxP = 0;
 
-  for (let i = 0; i < idxC; i++) {
-    if (m.notes[i] !== ":") idxP++;
-  }
+//   for (let i = 0; i < idxC; i++) {
+//     if (m[i] !== ":") idxP++;
+//   }
 
-  const _notes = m.notes.replaceAll(":", "");
+//   const _notes = m.replaceAll(":", "");
 
-  const len = _notes.length;
-  const step = 64 / len;
-  return m.pitch64[idxP * step]!;
-}
+//   const len = _notes.length;
+//   const step = 64 / len;
+//   return m.pitch64[idxP * step]!;
+// }
 
-export function getMelodyIndex(idxC: number, notes: string): number {
-  let idxM = 0;
-  let _notes = "";
+// export function getMelodyIndex(idxC: number, notes: string): number {
+//   let idxM = 0;
+//   let _notes = "";
 
-  for (let i = 0; i < idxC; i++) {
-    const c = notes.charAt(i);
-    if (c !== ":") idxM++;
-  }
+//   for (let i = 0; i < idxC; i++) {
+//     const c = notes.charAt(i);
+//     if (c !== ":") idxM++;
+//   }
 
-  for (let i = 0; i < notes.length; i++) {
-    const c = notes.charAt(i);
-    if (c !== ":") _notes += c;
-  }
+//   for (let i = 0; i < notes.length; i++) {
+//     const c = notes.charAt(i);
+//     if (c !== ":") _notes += c;
+//   }
 
-  const fLen = 64 / _notes.length;
-  return fLen * idxM;
-}
+//   const fLen = 64 / _notes.length;
+//   return fLen * idxM;
+// }
 
-export function getCursorForVNotes(
-  m: Measure,
-  idxC: number,
-  idxM: number
-): boolean {
-  const audioStore = useAudioStore();
-  if (!audioStore.activeTrack) return false;
+// export function getCursorForVNotes(
+//   m: Measure,
+//   idxC: number,
+//   idxM: number
+// ): boolean {
+//   const audioStore = useAudioStore();
+//   if (!audioStore.activeTrack) return false;
 
-  let colonIndices: number[] = [];
-  let currentNoteIdx: number = idxC;
+//   let colonIndices: number[] = [];
+//   let currentNoteIdx: number = idxC;
 
-  for (let i = 0; i < m.notes.length; i++) {
-    if (m.notes[i] === ":") colonIndices.push(i);
-  }
+//   for (let i = 0; i < m.notes.length; i++) {
+//     if (m.notes[i] === ":") colonIndices.push(i);
+//   }
 
-  if (colonIndices.includes(idxC)) return false;
+//   if (colonIndices.includes(idxC)) return false;
 
-  for (const colonIdx of colonIndices) {
-    if (idxC > colonIdx) currentNoteIdx -= 1;
-  }
+//   for (const colonIdx of colonIndices) {
+//     if (idxC > colonIdx) currentNoteIdx -= 1;
+//   }
 
-  const vNotesClean = m.notes.replaceAll(":", "");
-  const fLen = 64 / vNotesClean.length;
-  const nextNoteIdx = currentNoteIdx + 1;
+//   const vNotesClean = m.notes.replaceAll(":", "");
+//   const fLen = 64 / vNotesClean.length;
+//   const nextNoteIdx = currentNoteIdx + 1;
 
-  if (audioStore.activeTrack.currentMeasureIdx !== idxM) return false;
+//   if (audioStore.activeTrack.currentMeasureIdx !== idxM) return false;
 
-  if (audioStore.cursor === currentNoteIdx * fLen) return true;
+//   if (audioStore.cursor === currentNoteIdx * fLen) return true;
 
-  if (
-    audioStore.cursor < nextNoteIdx * fLen &&
-    audioStore.cursor > currentNoteIdx * fLen
-  )
-    return true;
+//   if (
+//     audioStore.cursor < nextNoteIdx * fLen &&
+//     audioStore.cursor > currentNoteIdx * fLen
+//   )
+//     return true;
 
-  return false;
-}
-
-export async function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+//   return false;
+// }
 
 export function selectAllText(e: Event) {
   const target = e.target as HTMLInputElement;

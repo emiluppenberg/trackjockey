@@ -1,33 +1,23 @@
 <script setup lang="ts">
-import { getCursorForVNotes, getMelodyIndex, type Pattern } from "~/types2";
+import { Measure, type Pattern } from "~/types2";
 
 const audioStore = useAudioStore();
 const viewMode = ref<boolean>(false);
 
-async function changeActiveTrackCurrentMeasure(idxM: number) {
-  if (!audioStore.activeTrack) return;
-
-  audioStore.activeTrack.currentMeasureIdx = idxM;
-}
-
-async function changeActiveTrackNextMeasure(e: MouseEvent, idxM: number) {
-  e.preventDefault();
-  if (!audioStore.activeTrack) return;
-
-  audioStore.activeTrack.nextMeasureIdxs.push(idxM);
-}
-
 function checkNextMeasureIdxs(idxM: number): boolean {
-  return (
-    audioStore.activeTrack?.nextMeasureIdxs.some((i) => i === idxM) ?? false
-  );
+  return audioStore.activeTrack!.nextMeasures.some((i) => i === idxM) ?? false;
 }
 
-async function toggleMutePattern(p: Pattern) {
-  p.mute = !p.mute;
+function checkCursor(p: Pattern, m: Measure, idxM: number, idxC: number) {
+  if (audioStore.activeTrack!.currentMeasure !== idxM) return false;
 
-  if (!p.mute) p.velocityNode.gain.value = 0;
-  if (p.mute) p.velocityNode.gain.value = 1;
+  const value = p.notePos[idxM]![m.formatPos.findIndex((fp) => fp === idxC)];
+
+  if (!value) return false;
+
+  if (audioStore.cursor === value.pos64) return true;
+
+  return false;
 }
 </script>
 
@@ -48,24 +38,26 @@ async function toggleMutePattern(p: Pattern) {
         id="tracker-active-mute-buttons"
         class="flex flex-col w-[100px] border-r border-white"
       >
-        <button
-          v-for="(p, idxP) in audioStore.activeTrack?.figure?.patterns"
-          class="h-[40px] text-center overflow-x-hidden overflow-y-hidden border-b border-white"
-          :class="{ 'bg-green-600': !p.mute, 'bg-red-600': p.mute }"
-          @click="() => toggleMutePattern(p)"
+        <div
+          v-for="(p, idxP) in audioStore.activeTrack!.figure?.patterns"
+          class="h-[40px] text-center text-white overflow-x-hidden overflow-y-hidden border-b border-white"
         >
           {{ p.sample.name }}
-        </button>
+        </div>
       </div>
       <!-- Patterns and measures -->
       <div
         id="tracker-active-patterns"
         class="max-w-[1800px] min-h-[40px] flex flex-col bg-black overflow-x-auto"
+        :class="{
+          'bg-black': !audioStore.activeTrack!.mute,
+          'bg-red-500': audioStore.activeTrack!.mute,
+        }"
       >
         <div
           :id="`tracker-active-pattern-${idxP}`"
-          v-for="(p, idxP) in audioStore.activeTrack?.figure?.patterns"
-          class="flex border-cyan-400 bg-black text-white h-[40px]"
+          v-for="(p, idxP) in audioStore.activeTrack!.figure?.patterns"
+          class="flex border-cyan-400 text-white h-[40px]"
         >
           <div
             v-for="(m, idxM) in p.measures"
@@ -75,15 +67,15 @@ async function toggleMutePattern(p: Pattern) {
               'border-cyan-400': !checkNextMeasureIdxs(idxM),
               'border-lime-400': checkNextMeasureIdxs(idxM),
             }"
-            @click="changeActiveTrackCurrentMeasure(idxM)"
-            @click.right="(e) => changeActiveTrackNextMeasure(e, idxM)"
+            @click="() => (audioStore.activeTrack!.currentMeasure = idxM)"
+            @click.right.prevent="() => audioStore.activeTrack!.nextMeasures.push(idxM)"
           >
             <!-- Velocity -->
             <div
               v-for="(c, idxC) in m.notes"
               class="text-center w-[2em]"
               :class="{
-                'text-emerald-600': getCursorForVNotes(m, idxC, idxM),
+                'text-emerald-600': checkCursor(p, m, idxM, idxC),
                 hidden: viewMode,
               }"
             >
@@ -94,7 +86,7 @@ async function toggleMutePattern(p: Pattern) {
               v-for="(c, idxC) in m.notes"
               class="text-center w-[2em]"
               :class="{
-                'text-emerald-600': getCursorForVNotes(m, idxC, idxM),
+                'text-emerald-600': checkCursor(p, m, idxM, idxC),
                 hidden: !viewMode,
               }"
             >
@@ -103,7 +95,7 @@ async function toggleMutePattern(p: Pattern) {
                 v-if="Number(c)"
                 class="flex italic text-xs text-center justify-center border-l border-cyan-400"
               >
-                {{ m.pitch64[getMelodyIndex(idxC, m.notes)] }}
+                {{ c }}
               </div>
               <!-- NonValue -->
               <div v-else class="w-full h-full flex justify-center">
@@ -115,7 +107,7 @@ async function toggleMutePattern(p: Pattern) {
               v-if="checkNextMeasureIdxs(idxM)"
               class="absolute inset-0 opacity-50 text-center text-4xl text-lime-400"
             >
-              {{ audioStore.activeTrack?.nextMeasureIdxs.indexOf(idxM)! + 1 }}
+              {{ audioStore.activeTrack!.nextMeasures.indexOf(idxM)! + 1 }}
             </div>
           </div>
         </div>

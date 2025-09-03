@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { cloneFigure, createMixer, type Track } from "~/types2";
+import { createMixer, type Track } from "~/types2";
 
 const audioStore = useAudioStore();
-const audioContext = audioStore.audioContext!;
+const ctx = audioStore.ctx!;
 const tracker = audioStore.tracker!;
 
 function changeTrackerBpm(e: Event) {
@@ -31,9 +31,10 @@ function changeTracksLength(e: Event) {
         // Make nicer
         tracker.tracks.push({
           figure: undefined,
-          mixer: createMixer(audioStore.audioContext!),
-          currentMeasureIdx: 0,
-          nextMeasureIdxs: [],
+          mixer: createMixer(ctx!),
+          currentMeasure: 0,
+          nextMeasures: [],
+          mute: false
         });
       }
     }
@@ -46,14 +47,15 @@ async function changeTrackFigure(e: KeyboardEvent, t: Track) {
   e.preventDefault();
 
   if (e.code === "KeyQ") {
-    t.figure = undefined;
+    t.mute = !t.mute;
     return;
   }
 
   const f = audioStore.figures.find((_f) => _f.keyBind === e.code);
 
   if (f) {
-    t.figure = await cloneFigure(f, audioContext);
+    t.currentMeasure = 0;
+    t.figure = await f.clone(ctx);
     await audioStore.mixerConnectTrack(t);
   }
 }
@@ -71,7 +73,7 @@ async function changeTrackNextFigure(e: KeyboardEvent, t: Track) {
   const f = audioStore.figures.find((_f) => _f.keyBind === e.code);
 
   if (f) {
-    t.nextFigure = await cloneFigure(f, audioContext);
+    t.nextFigure = await f.clone(ctx);
   }
 }
 
@@ -91,6 +93,7 @@ function pushTracksNextFigure() {
   const tracks = tracker.tracks.filter((t) => t.nextFigure);
 
   for (const t of tracks) {
+    t.currentMeasure = 0;
     t.figure = t.nextFigure;
     t.nextFigure = undefined;
     audioStore.mixerConnectTrack(t);

@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { createFigure } from "~/types2";
+import { Figure } from '~/types2';
+
 const audioStore = useAudioStore();
-const audioContext = audioStore.audioContext!;
 
 function addFigure() {
-  const fLen = audioStore.figures.push(createFigure(audioStore.fLen, "New figure", "", []));
+  const fLen = audioStore.figures.push(new Figure(audioStore.fLen, "New figure", "", []));
   audioStore.activeFigure = audioStore.figures[fLen - 1];
 }
 function removeFigure(idxF: number) {

@@ -1,21 +1,17 @@
 import {
-  createFigure,
-  createSample,
-  type Figure,
+  Pattern,
   type Mixer,
-  type Sample,
   type Tracker,
   createMixer,
+  Figure,
+  Sample,
   type Track,
-  createMeasure,
   type Measure,
-  cloneFigure,
-  type Pattern,
-  createPattern,
+  type Note,
 } from "~/types2";
 
 export const useAudioStore = defineStore("audioStore", () => {
-  const audioContext = ref<AudioContext>();
+  const ctx = ref<AudioContext>();
   const figures = ref<Figure[]>([]);
   const samples = ref<Sample[]>([]);
   const tracker = ref<Tracker>();
@@ -39,28 +35,31 @@ export const useAudioStore = defineStore("audioStore", () => {
   const velPool = ref<GainNode[]>([]);
 
   const cursor = ref<number>(0);
+
+  const log = ref<string>("");
   const processedStop1 = ref<number>(0);
   const processedStop2 = ref<number>(0);
   const processedStop3 = ref<number>(0);
 
   onMounted(async () => {
-    audioContext.value = new AudioContext();
-    await audioContext.value.audioWorklet.addModule("/pitch-processor.js");
+    ctx.value = new AudioContext();
+    await ctx.value.audioWorklet.addModule("/pitch-processor.js");
 
-    eqAnalyser.value = audioContext.value.createAnalyser();
-    compAnalyser.value = audioContext.value.createAnalyser();
+    eqAnalyser.value = ctx.value.createAnalyser();
+    compAnalyser.value = ctx.value.createAnalyser();
 
     tracker.value = {
       bpm: 120,
       tracks: [
         {
           figure: undefined,
-          mixer: createMixer(audioContext.value),
-          currentMeasureIdx: 0,
-          nextMeasureIdxs: [],
+          mixer: createMixer(ctx.value),
+          currentMeasure: 0,
+          nextMeasures: [],
+          mute: false,
         },
       ],
-      master: createMixer(audioContext.value),
+      master: createMixer(ctx.value),
     };
 
     activeMixer.value = tracker.value.tracks[0]!.mixer;
@@ -69,7 +68,7 @@ export const useAudioStore = defineStore("audioStore", () => {
     tracker.value.master.pannerNode
       .connect(tracker.value.master.gainNode)
       // .connect(tracker.value.mixer.pitcherNode)
-      .connect(audioContext.value.destination);
+      .connect(ctx.value.destination);
 
     loadFigures();
   });
@@ -94,7 +93,7 @@ export const useAudioStore = defineStore("audioStore", () => {
   );
 
   function getGain(): GainNode {
-    return velPool.value!.pop() || audioContext.value!.createGain();
+    return velPool.value!.pop() || ctx.value!.createGain();
   }
 
   function recycle(velNode: GainNode, srcNode: AudioBufferSourceNode) {
@@ -111,27 +110,39 @@ export const useAudioStore = defineStore("audioStore", () => {
   async function startTracker() {
     if (isPlaying.value) return;
 
+    tracker.value!.tracks.forEach((t) => {
+      t.currentMeasure = 0;
+      t.figure?.patterns.forEach((p) => {
+        p.currentMeasure = 0;
+        p.currentPos = 0;
+      });
+    });
+
     isPlaying.value = true;
-    tracker.value!.tracks.forEach((t) => (t.currentMeasureIdx = 0));
     let noteLen = 60 / tracker.value!.bpm / 16;
-    let nextNoteTime = audioContext.value!.currentTime;
+    let nextNoteTime = ctx.value!.currentTime;
     const scheduleAhead = 0.2; // s
-    const lookAhead = 25; // ms
 
     const loop = async () => {
       if (!isPlaying.value) return;
 
-      while (nextNoteTime < audioContext.value!.currentTime + scheduleAhead) {
+      const loopStart = performance.now();
+      let cycleCount = 0;
+
+      while (nextNoteTime < ctx.value!.currentTime + scheduleAhead) {
         const cycleStart = nextNoteTime;
 
-        const proccesingStart = performance.now();
+        // const proccesingStart = performance.now();
 
         for (const t of tracker.value!.tracks) {
           if (!t.figure) continue;
+          if (t.mute) continue;
           cycleTrackPatterns(t, noteLen, cycleStart);
+          cycleCount++;
         }
 
         // console.log(
+        //   "cycle: ",
         //   (performance.now() - proccesingStart).toFixed(2),
         //   processedStop1.value,
         //   processedStop2.value,
@@ -146,7 +157,23 @@ export const useAudioStore = defineStore("audioStore", () => {
         if (cursor.value === 64) cursor.value = 0;
       }
 
-      setTimeout(loop, lookAhead);
+      // log.value = log.value.concat(
+      //   `loop: ${(performance.now() - loopStart).toFixed(2)} - cycles: ${cycleCount}\n`
+      // );
+
+      // const logString =
+      //   "cycles: " +
+      //   cycleCount +
+      //   " " +
+      //   processedStop1.value +
+      //   " " +
+      //   processedStop2.value +
+      //   " " +
+      //   processedStop3.value;
+
+      // log.value = log.value.concat(`${logString}\n`);
+
+      requestAnimationFrame(loop);
     };
 
     loop();
@@ -154,54 +181,55 @@ export const useAudioStore = defineStore("audioStore", () => {
 
   function cycleTrackPatterns(t: Track, noteLen: number, cycleStart: number) {
     for (const p of t.figure!.patterns) {
+      if (p.currentMeasure !== t.currentMeasure) continue;
+      if (t.currentMeasure >= t.figure!.measureCount)
+        t.currentMeasure = 0;
+
       const _currentMeasure = p.currentMeasure;
-      const m = p.measures[_currentMeasure];
+      const _currentPos = p.currentPos;
+      const note = p.notePos[_currentMeasure]![_currentPos]!;
 
-      if (!m) continue;
-      if (p.currentMeasure !== t.currentMeasureIdx) continue;
+      if (!note) continue;
+      if (note.pos64 !== cursor.value) continue;
 
-      scheduleMeasureNote(t, p, m, noteLen, cycleStart, _currentMeasure);
+      scheduleNote(p, note, noteLen, cycleStart, _currentMeasure, _currentPos);
     }
 
     let elapsedMeasures = t.figure!.patterns.filter(
-      (p) => p.currentMeasure > t.currentMeasureIdx
+      (p) => p.currentMeasure > t.currentMeasure
     );
 
     if (elapsedMeasures.length === t.figure!.patterns.length) {
-      t.currentMeasureIdx++;
+      t.currentMeasure++;
     }
-    if (t.currentMeasureIdx === t.figure!.measureCount) {
+    if (t.currentMeasure === t.figure!.measureCount) {
       t.figure!.patterns.forEach((p) => (p.currentMeasure = 0));
-      t.currentMeasureIdx = 0;
+      t.currentMeasure = 0;
     }
   }
 
-  function scheduleMeasureNote(
-    t: Track,
+  function scheduleNote(
     p: Pattern,
-    m: Measure,
+    note: Note,
     noteLen: number,
     cycleStart: number,
-    _idxCurrentMeasure: number
+    _currentMeasure: number,
+    _currentPos: number
   ) {
-    const _idx64 = m.idx64;
-    const vNote = m.velocity64[_idx64]!;
-    if (vNote.pos64 !== cursor.value) return;
-
     const startTime = cycleStart;
     const stopTime = getNextNoteStopTime(
       p,
-      _idxCurrentMeasure,
-      _idx64,
+      _currentMeasure,
+      _currentPos,
       cycleStart,
       noteLen
     );
 
-    const velocity = (vNote.value * 2) / 10;
-    const pitch = m.pitch64[m.idx64]!.value! * 100;
+    const velocity = (note.velocity * 2) / 10;
+    const pitch = note.pitch * 100;
 
     const velNode = getGain();
-    const srcNode = audioContext.value!.createBufferSource();
+    const srcNode = ctx.value!.createBufferSource();
     srcNode.buffer = p.sample.audioBuffer;
     srcNode.detune.value = pitch;
     velNode.gain.value = velocity;
@@ -212,49 +240,47 @@ export const useAudioStore = defineStore("audioStore", () => {
 
     srcNode.onended = () => recycle(velNode, srcNode);
 
-    m.idx64++;
-    if (m.idx64 >= m.velocity64.length) {
-      m.idx64 = 0;
+    p.currentPos++;
+    if (p.currentPos === p.notePos[_currentMeasure]!.length) {
       p.currentMeasure++;
+      p.currentPos = 0;
     }
   }
 
   function getNextNoteStopTime(
     p: Pattern,
-    _idxCurrentMeasure: number,
-    _idx64: number,
+    _currentMeasure: number,
+    _currentPos: number,
     cycleStart: number,
     noteLen: number
   ): number {
-    let next_vNote = p.measures[_idxCurrentMeasure]!.velocity64[_idx64 + 1];
     let next_mOffset;
     let next_nOffset;
+    let note: Note;
 
-    if (next_vNote) {
-      processedStop1.value++; // For logging
+    if (p.notePos[_currentMeasure]!.length > _currentPos + 1) {
+      processedStop1.value++;
 
-      next_mOffset = noteLen * _idxCurrentMeasure * 64;
-      next_nOffset = next_vNote.pos64 * noteLen;
+      note = p.notePos[_currentMeasure]![_currentPos + 1]!;
+      next_mOffset = noteLen * _currentMeasure * 64;
+      next_nOffset = note.pos64 * noteLen;
       return cycleStart + next_mOffset + next_nOffset;
-    } else {
-      let next_m = p.measures[_idxCurrentMeasure + 1];
-
-      if (next_m) {
-        processedStop2.value++; // For logging
-
-        next_vNote = p.measures[_idxCurrentMeasure + 1]!.velocity64[0]!;
-        next_mOffset = noteLen * (_idxCurrentMeasure + 1) * 64;
-        next_nOffset = next_vNote.pos64 * noteLen;
-        return cycleStart + next_mOffset + next_nOffset;
-      } else {
-        processedStop3.value++; // For logging
-
-        const first_Vnote = p.measures[0]!.velocity64[0]!;
-        next_mOffset = noteLen * 0 * 64;
-        next_nOffset = (64 + first_Vnote.pos64) * noteLen;
-        return cycleStart + next_mOffset + next_nOffset;
-      }
     }
+
+    if (p.notePos.length > _currentMeasure + 1) {
+      processedStop2.value++;
+
+      note = p.notePos[_currentMeasure + 1]![0]!;
+      next_mOffset = noteLen * 64; // Next measure
+      next_nOffset = note.pos64 * noteLen;
+      return cycleStart + next_mOffset + next_nOffset;
+    }
+    processedStop3.value++;
+
+    note = p.notePos[0]![0]!;
+    next_mOffset = noteLen * 64; // Next measure
+    next_nOffset = note.pos64 * noteLen;
+    return cycleStart + next_mOffset + next_nOffset;
   }
 
   async function stopTracker() {
@@ -263,8 +289,6 @@ export const useAudioStore = defineStore("audioStore", () => {
   }
 
   async function loadFigures() {
-    if (!audioContext.value) return;
-
     for (const s of samples.value) {
       samples.value.pop();
     }
@@ -283,100 +307,82 @@ export const useAudioStore = defineStore("audioStore", () => {
       const sample = await fetch(wavs[i]!)
         .then((response) => response.arrayBuffer())
         .then(
-          (arrayBuffer) => audioContext.value!.decodeAudioData(arrayBuffer)!
+          (arrayBuffer) => ctx.value!.decodeAudioData(arrayBuffer)!
         );
 
-      const fileName = wavs[i]!.split("/").pop();
+      const fileName = wavs[i]!.split("/").pop()!;
 
-      samples.value.push(createSample(sample, fileName!, fileName));
+      samples.value.push(new Sample(sample, fileName, fileName));
     }
 
-    const kick1M = createMeasure("5-5-:5-5-", 0);
-    const hihat1M = createMeasure("-5-5:-5-5", 0);
-    const snare1M = createMeasure("--5-:--5-", 0);
+    const kick1M = "5-5-:5-5-";
+    const hihat1M = "-5-5:-5-5";
+    const snare1M = "--5-:--5-";
 
-    const kick2M1 = createMeasure("5---:5--2:-25-:--5-", 0);
-    const hihat2M1 = createMeasure("5-5-5-5-:5---5-23:1-5-5-5-:1-5-5-5-", 0);
-    const snare2M1 = createMeasure("----:5---:-2--:5---", 0);
-    const kick2M2 = createMeasure("5---:5--2:-25-:--5-", 1);
-    const hihat2M2 = createMeasure("5-5-5-5-:5---5-23:1-5-5-5-:1-5-5-5-", 1);
-    const snare2M2 = createMeasure("0-", 1);
-    const kick2M3 = createMeasure("0-", 2);
-    const hihat2M3 = createMeasure("5-5-5-5-:5---5-23:1-5-5-5-:1-5-5-5-", 2);
-    const snare2M3 = createMeasure("5---:5--2:-25-:--5-", 2);
-    const perc2M1 = createMeasure("---5:---5", 0);
+    const kick2M1 = "5---:5--2:-25-:--5-";
+    const hihat2M1 = "5-5-5-5-:5---5-23:1-5-5-5-:1-5-5-5-";
+    const snare2M1 = "----:5---:-2--:5---";
+    const kick2M2 = "5---:5--2:-25-:--5-";
+    const hihat2M2 = "5-5-5-5-:5---5-23:1-5-5-5-:1-5-5-5-";
+    const snare2M2 = "0-";
+    const kick2M3 = "0-";
+    const hihat2M3 = "5-5-5-5-:5---5-23:1-5-5-5-:1-5-5-5-";
+    const snare2M3 = "5---:5--2:-25-:--5-";
+    const perc2M1 = "---5:---5";
 
-    const shi3M1 = createMeasure("2---:02--", 0);
+    const shi3M1 = "2---:--02";
+    const shi3M2 = "----:-2--";
 
-    const patternsRecord: Record<number, Pattern[]> = {
-      1: [],
-      2: [],
-      3: [],
-    };
+    const kick1P = new Pattern(
+      samples.value.find((s) => s.name === "kick1.wav")!,
+      ctx.value!.createGain()
+    );
+    kick1P.addMeasure(kick1M);
+    const hihat1P = new Pattern(
+      samples.value.find((s) => s.name === "hihat1.wav")!,
+      ctx.value!.createGain()
+    );
+    hihat1P.addMeasure(hihat1M);
+    const snare1P = new Pattern(
+      samples.value.find((s) => s.name === "snare1.wav")!,
+      ctx.value!.createGain()
+    );
+    snare1P.addMeasure(snare1M);
 
-    for (const s of samples.value) {
-      if (s.fileName?.includes("kick1.wav")) {
-        patternsRecord[1]!.push(createPattern(s, [kick1M], audioContext.value));
-      }
-      if (s.fileName?.includes("hihat1.wav")) {
-        patternsRecord[1]!.push(
-          createPattern(s, [hihat1M], audioContext.value)
-        );
-      }
-      if (s.fileName?.includes("snare1.wav")) {
-        patternsRecord[1]!.push(
-          createPattern(s, [snare1M], audioContext.value)
-        );
-      }
-      if (s.fileName?.includes("kick2.wav")) {
-        patternsRecord[2]!.push(
-          createPattern(s, [kick2M1, kick2M2, kick2M3], audioContext.value)
-        );
-      }
-      if (s.fileName?.includes("hihat2.wav")) {
-        patternsRecord[2]!.push(
-          createPattern(s, [hihat2M1, hihat2M2, hihat2M3], audioContext.value)
-        );
-      }
-      if (s.fileName?.includes("snare2.wav")) {
-        patternsRecord[2]!.push(
-          createPattern(s, [snare2M1, snare2M2, snare2M3], audioContext.value)
-        );
-      }
-      if (s.fileName?.includes("perc2.wav")) {
-        patternsRecord[2]!.push(
-          createPattern(s, [perc2M1, perc2M1, perc2M1], audioContext.value)
-        );
-      }
-      if (s.fileName?.includes("shi3.wav")) {
-        patternsRecord[3]!.push(createPattern(s, [shi3M1], audioContext.value));
-      }
-    }
+    const kick2P = new Pattern(
+      samples.value.find((s) => s.name === "kick2.wav")!,
+      ctx.value!.createGain()
+    );
+    kick2P.addMeasure(kick2M1);
+    kick2P.addMeasure(kick2M2);
+    kick2P.addMeasure(kick2M3);
+    const snare2P = new Pattern(
+      samples.value.find((s) => s.name === "snare2.wav")!,
+      ctx.value!.createGain()
+    );
+    snare2P.addMeasure(snare2M1);
+    snare2P.addMeasure(snare2M2);
+    snare2P.addMeasure(snare2M3);
+    const hihat2P = new Pattern(
+      samples.value.find((s) => s.name === "hihat2.wav")!,
+      ctx.value!.createGain()
+    );
+    hihat2P.addMeasure(hihat2M1);
+    hihat2P.addMeasure(hihat2M2);
+    hihat2P.addMeasure(hihat2M3);
 
-    for (let i = 1; i < 4; i++) {
-      let fPatterns: Pattern[] = [];
-      let fName = "";
-      let fKeyBind = "";
+    const shi3P = new Pattern(
+      samples.value.find((s) => s.name === "shi3.wav")!,
+      ctx.value!.createGain()
+    );
+    shi3P.addMeasure(shi3M1);
+    shi3P.addMeasure(shi3M2);
 
-      if (i === 1) {
-        fName = "drums1";
-        fKeyBind = "KeyA";
-      }
-      if (i === 2) {
-        fName = "drums2";
-        fKeyBind = "KeyS";
-      }
-      if (i === 3) {
-        fName = "shi3";
-        fKeyBind = "KeyD";
-      }
+    const drums1 = new Figure(0, "drums1", "KeyA", [kick1P, hihat1P, snare1P]);
+    const drums2 = new Figure(1, "drums2", "KeyS", [kick2P, snare2P, hihat2P]);
+    const shi3 = new Figure(2, "shi3", "KeyD", [shi3P]);
 
-      for (const pr of patternsRecord[i]!) {
-        fPatterns.push(pr);
-      }
-
-      figures.value.push(createFigure(fLen.value, fName, fKeyBind, fPatterns));
-    }
+    figures.value.push(drums1, drums2, shi3);
 
     activeFigure.value = figures.value[0];
   }
@@ -404,13 +410,11 @@ export const useAudioStore = defineStore("audioStore", () => {
   }
 
   async function mixerConnectTrack(t: Track) {
-    if (!audioContext.value) return;
-    if (!tracker.value) return;
     if (!t.figure) return;
 
     mixerConnect(t.mixer);
     t.mixer.gainNode.disconnect();
-    t.mixer.gainNode.connect(tracker.value.master.pannerNode);
+    t.mixer.gainNode.connect(tracker.value!.master.pannerNode);
 
     for (const p of t.figure.patterns) {
       p.velocityNode.disconnect();
@@ -420,29 +424,19 @@ export const useAudioStore = defineStore("audioStore", () => {
   }
 
   function mixerConnectEqAnalyser() {
-    if (!activeMixer.value) return;
-    if (!audioContext.value) return;
-
-    eqAnalyser.value = audioContext.value.createAnalyser();
+    eqAnalyser.value = ctx.value!.createAnalyser();
     eqAnalyser.value.fftSize = eq_fftSize;
-    activeMixer.value.gainNode.connect(eqAnalyser.value);
+    activeMixer.value!.gainNode.connect(eqAnalyser.value);
   }
 
   function mixerConnectCompAnalyser() {
-    if (!activeMixer.value) return;
-    if (!audioContext.value) return;
-
-    compAnalyser.value = audioContext.value.createAnalyser();
+    compAnalyser.value = ctx.value!.createAnalyser();
     compAnalyser.value.fftSize = comp_fftSize;
-    activeMixer.value.gainNode.connect(compAnalyser.value);
+    activeMixer.value!.gainNode.connect(compAnalyser.value);
   }
 
   function reloadActiveFigureTracks() {
-    if (!tracker.value) return;
-    if (!audioContext.value) return;
-    if (!activeFigure.value) return;
-
-    const fTracks = tracker.value.tracks.filter(
+    const fTracks = tracker.value!.tracks.filter(
       (t) => t.figure?.id === activeFigure.value!.id
     );
 
@@ -450,14 +444,19 @@ export const useAudioStore = defineStore("audioStore", () => {
 
     if (fTracks.length > 0) {
       for (const t of fTracks) {
-        t.figure = cloneFigure(activeFigure.value, audioContext.value);
+        t.figure = activeFigure.value!.clone(ctx.value!);
         mixerConnectTrack(t);
       }
     }
   }
 
+  function logLog() {
+    console.log(log.value);
+    log.value = "";
+  }
+
   return {
-    audioContext,
+    ctx,
     figures,
     samples,
     tracker,
@@ -472,6 +471,7 @@ export const useAudioStore = defineStore("audioStore", () => {
     cursor,
     currentMeasureIdx,
     fLen,
+    log,
     startTracker,
     stopTracker,
     mixerConnect,
@@ -480,5 +480,6 @@ export const useAudioStore = defineStore("audioStore", () => {
     mixerConnectCompAnalyser,
     loadFigures,
     reloadActiveFigureTracks,
+    logLog,
   };
 });

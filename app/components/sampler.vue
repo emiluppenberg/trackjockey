@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { createSample } from "~/types2";
+import { Sample } from "~/types2";
+
 const audioStore = useAudioStore();
 const samples = audioStore.samples;
-const audioContext = audioStore.audioContext!;
+const ctx = audioStore.ctx!;
 
 async function addSample() {
   const newFile = (
@@ -10,12 +11,10 @@ async function addSample() {
   ).files?.item(0);
 
   if (newFile) {
-    const audioBuffer = await audioContext.decodeAudioData(
+    const audioBuffer = await ctx.decodeAudioData(
       await newFile.arrayBuffer()
     );
-    samples.push(
-      createSample(audioBuffer, newFile.name, newFile.name)
-    );
+    samples.push(new Sample(audioBuffer, newFile.name, newFile.name));
   }
 }
 async function changeSample(idxS: number) {
@@ -24,7 +23,7 @@ async function changeSample(idxS: number) {
   ).files?.item(0);
 
   if (newFile) {
-    const audioBuffer = await audioContext.decodeAudioData(
+    const audioBuffer = await ctx.decodeAudioData(
       await newFile.arrayBuffer()
     );
 
