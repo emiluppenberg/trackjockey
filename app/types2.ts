@@ -49,7 +49,6 @@ export class Pattern {
     public velocityNode: GainNode,
     public mute: boolean = false,
     public measures: Measure[] = [],
-    public notePos: Note[][] = [],
     public currentMeasure: number = 0,
     public currentPos: number = 0,
     public srcNodes: Set<AudioBufferSourceNode> = new Set()
@@ -61,21 +60,18 @@ export class Pattern {
       ctx.createGain(),
       this.mute,
       this.measures,
-      this.notePos,
       0,
       0,
       new Set()
     );
   }
 
-  addMeasure(notes: string) {
-    this.measures.push(new Measure(notes));
-    this.notePos.push(initializeNotes64(notes));
+  addMeasure(notation?: string) {
+    this.measures.push(new Measure(notation));
   }
 
-  insertMeasure(notes: string, idx: number) {
-    this.measures.splice(idx, 1, new Measure(notes));
-    this.notePos.splice(idx, 1, initializeNotes64(notes));
+  insertMeasure(idx: number, notation?: string) {
+    this.measures.splice(idx, 1, new Measure(notation));
   }
 
   disconnect() {
@@ -85,22 +81,30 @@ export class Pattern {
 }
 
 export class Measure {
-  cursorPos: number[]; // Contains the indices of notes[i] with a value - same length as patterns[x].notePos[i][j]
-  notes: string;
+  cursorPos?: number[]; // Contains the indices of notes[i] with a value - same length as patterns[x].notePos[i][j]
+  notes?: Note[];
+  notation?: string;
 
-  constructor(notes: string) {
-    let cursorPos: number[] = [];
+  constructor(notation?: string) {
+    if (notation) {
+      let cursorPos: number[] = [];
 
-    for (let i = 0; i < notes.length; i++) {
-      const c = notes.charAt(i);
+      for (let i = 0; i < notation.length; i++) {
+        const c = notation.charAt(i);
 
-      if (!isNaN(Number(c)) || c === "*") {
-        cursorPos.push(i);
+        if (!isNaN(Number(c))) {
+          cursorPos.push(i);
+        }
       }
-    }
 
-    this.notes = notes;
-    this.cursorPos = cursorPos;
+      this.notes = initializeNotes64(notation);
+      this.notation = notation;
+      this.cursorPos = cursorPos;
+    } else {
+      this.cursorPos = undefined;
+      this.notes = undefined;
+      this.notation = undefined;
+    }
   }
 }
 
@@ -159,15 +163,19 @@ export class Track {
     }
   }
 
-  setCurrentMeasure(idxM: number) {
+  setCurrentMeasure(idxM: number, cursor64: number) {
     if (this.figure) {
       this.figure.patterns.forEach((p) => {
-        // Find next note in next measure adjusting for current pos64
-        p.currentPos = p.notePos[idxM]!.findIndex(
-          (n) =>
-            n.pos64 > p.notePos[p.currentMeasure]![p.currentPos]!.pos64 ||
-            p.notePos[idxM]!.length - 1
-        );
+        // Find next note in new measure adjusting for cursor position
+        if (p.measures[idxM]!.notes) {
+          
+          p.currentPos = p.measures[idxM]!.notes!.findIndex(
+            (n) => n.pos64 > cursor64
+          );
+
+          if (p.currentPos < 0) p.currentPos = 0;
+
+        } else p.currentPos = 0;
 
         p.currentMeasure = idxM;
       });

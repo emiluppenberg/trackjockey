@@ -1,7 +1,7 @@
 <script setup lang="ts">
 useHead({
   bodyAttrs: {
-    class: "bg-slate-400",
+    class: "bg-black text-white",
   },
 });
 </script>

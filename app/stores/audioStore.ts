@@ -83,13 +83,9 @@ export const useAudioStore = defineStore("audioStore", () => {
     srcNode: AudioBufferSourceNode,
     p_srcNodes: Set<AudioBufferSourceNode>
   ) {
-    try {
-      velNode.disconnect();
-      srcNode.disconnect();
-      if (p_srcNodes.has(srcNode)) p_srcNodes.delete(srcNode);
-    } catch (e) {
-      console.log("error ", e);
-    }
+    velNode.disconnect();
+    srcNode.disconnect();
+    if (p_srcNodes.has(srcNode)) p_srcNodes.delete(srcNode);
   }
 
   async function startTracker() {
@@ -114,6 +110,7 @@ export const useAudioStore = defineStore("audioStore", () => {
 
       while (nextNoteTime < ctx.value!.currentTime + scheduleAhead) {
         const cycleStart = nextNoteTime;
+
         for (const t of tracker.value!.tracks) {
           if (!t.figure) continue;
           if (t.mute) continue;
@@ -122,7 +119,28 @@ export const useAudioStore = defineStore("audioStore", () => {
 
         nextNoteTime += noteLen;
         cursor.value++;
-        if (cursor.value === 64) cursor.value = 0;
+
+        if (cursor.value === 64) {
+          cursor.value = 0;
+
+          for (const t of tracker.value!.tracks) {
+            if (!t.figure) continue;
+            if (t.mute) continue;
+
+            t.currentMeasure++;
+            if (t.nextMeasures.length > 0) {
+              t.currentMeasure = t.nextMeasures[0]!;
+              t.nextMeasures.splice(0, 1);
+            }
+            if (t.currentMeasure === t.figure.measureCount)
+              t.currentMeasure = 0;
+
+            for (const p of t.figure.patterns) {
+              p.currentMeasure = t.currentMeasure;
+              p.currentPos = 0;
+            }
+          }
+        }
       }
 
       // log.value = log.value.concat(`${logString}\n`);
@@ -135,70 +153,47 @@ export const useAudioStore = defineStore("audioStore", () => {
 
   function cycleTrackPatterns(t: Track, noteLen: number, cycleStart: number) {
     for (const p of t.figure!.patterns) {
-      if (p.currentMeasure !== t.currentMeasure) continue;
-      if (t.currentMeasure >= t.figure!.measureCount) t.currentMeasure = 0;
+      let nextMeasure;
+      if (t.nextMeasures.length > 0) nextMeasure = t.nextMeasures[0];
 
       const _currentMeasure = p.currentMeasure;
       const _currentPos = p.currentPos;
-      const note = p.notePos[_currentMeasure]![_currentPos]!;
 
-      if (!note) continue;
+      const measure = p.measures[_currentMeasure]!;
+      if (!measure.notes) return;
+
+      const note = measure.notes![_currentPos]!;
       if (note.pos64 !== cursor.value) continue;
 
       scheduleNote(
-        t,
         p,
         note,
         noteLen,
         cycleStart,
         _currentMeasure,
-        _currentPos
+        _currentPos,
+        nextMeasure
       );
-    }
-
-    let elapsedMeasures = t.figure!.patterns.filter(
-      (p) => p.currentMeasure !== t.currentMeasure
-    );
-
-    if (elapsedMeasures.length === t.figure!.patterns.length) {
-      let _nextMeasure;
-
-      if (t.nextMeasures.length > 0) _nextMeasure = t.nextMeasures.pop();
-      if (_nextMeasure) t.currentMeasure = _nextMeasure;
-      else t.currentMeasure++;
-    }
-
-    if (t.currentMeasure === t.figure!.measureCount) {
-      t.figure!.patterns.forEach((p) => (p.currentMeasure = 0));
-      t.currentMeasure = 0;
     }
   }
 
   function scheduleNote(
-    t: Track,
     p: Pattern,
     note: Note,
     noteLen: number,
     cycleStart: number,
     _currentMeasure: number,
-    _currentPos: number
+    _currentPos: number,
+    nextMeasure: number | undefined
   ) {
-    let nextMeasure;
-
-    if (t.nextMeasures.length > 0) {
-      if (_currentPos + 1 > p.notePos[_currentMeasure]!.length) {
-        nextMeasure = t.nextMeasures[t.nextMeasures.length - 1];
-      }
-    }
-
     const startTime = cycleStart;
-    const stopTime = getNextNoteStopTime(
+    const stopTime = getNoteStop(
       p,
-      nextMeasure,
       _currentMeasure,
       _currentPos,
       cycleStart,
-      noteLen
+      noteLen,
+      nextMeasure
     );
 
     const velocity = (note.velocity * 2) / 10;
@@ -217,59 +212,76 @@ export const useAudioStore = defineStore("audioStore", () => {
     p.srcNodes.add(srcNode);
     srcNode.onended = () => recycle(velNode, srcNode, p.srcNodes);
 
-    p.currentPos++;
-    if (p.currentPos === p.notePos[_currentMeasure]!.length) {
-      if (nextMeasure) p.currentMeasure = nextMeasure;
-      else p.currentMeasure++;
-
-      p.currentPos = 0;
-    }
+    if (_currentPos < p.measures[_currentMeasure]!.notes!.length - 1)
+      p.currentPos++;
   }
 
-  function getNextNoteStopTime(
+  function getNoteStop(
     p: Pattern,
-    nextMeasure: number | undefined,
     _currentMeasure: number,
     _currentPos: number,
     cycleStart: number,
-    noteLen: number
+    noteLen: number,
+    nextMeasure: number | undefined
   ): number {
-    let next_mOffset;
-    let next_nOffset;
+    let next_mOffset = 0;
+    let next_nOffset = 0;
     let note: Note;
 
+    // Check current measure
+    for (
+      let i = _currentPos + 1;
+      i < p.measures[_currentMeasure]!.notes!.length;
+      i++
+    ) {
+      if (p.measures[_currentMeasure]!.notes![i]) {
+        note = p.measures[_currentMeasure]!.notes![i]!;
+        next_mOffset = noteLen * _currentMeasure * 64;
+        next_nOffset = note.pos64 * noteLen;
+        return cycleStart + next_mOffset + next_nOffset;
+      }
+    }
+
+    // Check next measure and following
     if (nextMeasure) {
-      if (p.notePos[nextMeasure]!.length > _currentPos + 1)
-        note = p.notePos[nextMeasure]![_currentPos + 1]!;
-      else note = p.notePos[nextMeasure]![0]!;
-
-      next_mOffset = noteLen * nextMeasure * 64;
-      next_nOffset = note.pos64 * noteLen;
-      return cycleStart + next_mOffset + next_nOffset;
+      if (p.measures[nextMeasure]!.notes) {
+        note = p.measures[nextMeasure]!.notes![0]!;
+        next_mOffset = noteLen * nextMeasure * 64;
+        next_nOffset = note.pos64 * noteLen;
+        return cycleStart + next_mOffset + next_nOffset;
+      } else {
+        for (let i = nextMeasure + 1; i < p.measures.length; i++) {
+          if (p.measures[i]!.notes) {
+            note = p.measures[i]!.notes![0]!;
+            next_mOffset = noteLen * i * 64;
+            next_nOffset = note.pos64 * noteLen;
+            return cycleStart + next_mOffset + next_nOffset;
+          }
+        }
+      }
     }
 
-    if (p.notePos[_currentMeasure]!.length > _currentPos + 1) {
-      processedStop1.value++;
-
-      note = p.notePos[_currentMeasure]![_currentPos + 1]!;
-      next_mOffset = noteLen * _currentMeasure * 64;
-      next_nOffset = note.pos64 * noteLen;
-      return cycleStart + next_mOffset + next_nOffset;
+    // Else check current following measures
+    if (!nextMeasure) {
+      for (let i = _currentMeasure + 1; i < p.measures.length; i++) {
+        if (p.measures[i]!.notes) {
+          note = p.measures[i]!.notes![0]!;
+          next_mOffset = noteLen * i * 64;
+          next_nOffset = note.pos64 * noteLen;
+          return cycleStart + next_mOffset + next_nOffset;
+        }
+      }
     }
 
-    if (p.notePos.length > _currentMeasure + 1) {
-      processedStop2.value++;
-
-      note = p.notePos[_currentMeasure + 1]![0]!;
-      next_mOffset = noteLen * 64; // Next measure
-      next_nOffset = note.pos64 * noteLen;
-      return cycleStart + next_mOffset + next_nOffset;
+    // Else check previous measures
+    for (let i = 0; i <= _currentMeasure; i++) {
+      if (p.measures[i]!.notes) {
+        note = p.measures[i]!.notes![0]!;
+        next_mOffset = noteLen * (i + 1) * 64;
+        next_nOffset = note.pos64 * noteLen;
+      }
     }
-    processedStop3.value++;
 
-    note = p.notePos[0]![0]!;
-    next_mOffset = noteLen * 64; // Next measure
-    next_nOffset = note.pos64 * noteLen;
     return cycleStart + next_mOffset + next_nOffset;
   }
 
@@ -319,9 +331,7 @@ export const useAudioStore = defineStore("audioStore", () => {
     const perc2M1 = "---5:---5";
 
     const shi3M1 = "2---:--02";
-    const shi3M2 = "*";
     const shi3M3 = "--2-:---2";
-    const shi3M4 = "*";
 
     const kick1P = new Pattern(
       samples.value.find((s) => s.name === "kick1.wav")!,
@@ -366,9 +376,9 @@ export const useAudioStore = defineStore("audioStore", () => {
       ctx.value!.createGain()
     );
     shi3P.addMeasure(shi3M1);
-    shi3P.addMeasure(shi3M2);
+    shi3P.addMeasure();
     shi3P.addMeasure(shi3M3);
-    shi3P.addMeasure(shi3M4);
+    shi3P.addMeasure();
 
     const drums1 = new Figure(0, "drums1", "KeyA", [kick1P, hihat1P, snare1P]);
     const drums2 = new Figure(1, "drums2", "KeyS", [kick2P, snare2P, hihat2P]);

@@ -10,8 +10,9 @@ function checkNextMeasureIdxs(idxM: number): boolean {
 
 function checkCursor(p: Pattern, m: Measure, idxM: number, idxC: number) {
   if (audioStore.activeTrack!.currentMeasure !== idxM) return false;
+  if (!p.measures[idxM]!.notes) return;
 
-  const value = p.notePos[idxM]![m.cursorPos.findIndex((cp) => cp === idxC)];
+  const value = p.measures[idxM]!.notes![m.cursorPos!.findIndex((cp) => cp === idxC)];
 
   if (!value) return false;
 
@@ -67,12 +68,12 @@ function checkCursor(p: Pattern, m: Measure, idxM: number, idxC: number) {
               'border-cyan-400': !checkNextMeasureIdxs(idxM),
               'border-lime-400': checkNextMeasureIdxs(idxM),
             }"
-            @click="() => (audioStore.activeTrack!.setCurrentMeasure(idxM))"
+            @click="() => (audioStore.activeTrack!.setCurrentMeasure(idxM, audioStore.cursor))"
             @click.right.prevent="() => audioStore.activeTrack!.nextMeasures.push(idxM)"
           >
             <!-- Velocity -->
             <div
-              v-for="(c, idxC) in m.notes"
+              v-for="(c, idxC) in m.notation"
               class="text-center w-[2em]"
               :class="{
                 'text-emerald-600': checkCursor(p, m, idxM, idxC),
@@ -83,7 +84,7 @@ function checkCursor(p: Pattern, m: Measure, idxM: number, idxC: number) {
             </div>
             <!-- Melody -->
             <div
-              v-for="(c, idxC) in m.notes"
+              v-for="(c, idxC) in m.notation"
               class="text-center w-[2em]"
               :class="{
                 'text-emerald-600': checkCursor(p, m, idxM, idxC),

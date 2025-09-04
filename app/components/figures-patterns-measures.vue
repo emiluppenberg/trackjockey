@@ -19,7 +19,7 @@ function handleEditMeasureRhythm(idxP: number, idxMc: number, m: Measure) {
 
 function inputMeasureNotation(e: Event, p: Pattern, idxM: number) {
   const notes = (e.target as HTMLInputElement).value.toUpperCase();
-  p.insertMeasure(notes, idxM);
+  p.insertMeasure(idxM, notes);
 }
 </script>
 
@@ -52,7 +52,7 @@ function inputMeasureNotation(e: Event, p: Pattern, idxM: number) {
               class="w-full field-sizing-content text-center text-xl content-center bg-black text-white"
               rows="1"
               :class="{ hidden: editMeasure !== m }"
-              :value="m.notes"
+              :value="m.notation"
               @change="(e) => inputMeasureNotation(e, p, idxM)"
               @focusout="editMeasure = undefined"
               wrap="soft"
@@ -67,19 +67,20 @@ function inputMeasureNotation(e: Event, p: Pattern, idxM: number) {
                 class="w-full h-full flex items-center justify-evenly text-2xl"
                 @focus="handleEditMeasureRhythm(idxP, idxM, m)"
               >
-                <div v-for="(c, idxC) in m.notes" class="text-center w-[2em]">
+                <div v-for="(c, idxC) in m.notation" class="text-center w-[2em]">
                   {{ c }}
                 </div>
               </div>
             </div>
             <!-- Melody -->
             <div
+            v-if="m.notes"
               class="flex w-full h-full border-b border-cyan-400 bg-sky-900"
               :class="{ hidden: !editMode }"
             >
               <div class="w-full h-full flex justify-between text-xl">
                   <div
-                    v-for="(c, idxC) in m.notes"
+                    v-for="(c, idxC) in m.notation"
                     class="w-[2em] h-1/2 place-self-center select-none"
                   >
                     <!-- Value -->
@@ -91,7 +92,7 @@ function inputMeasureNotation(e: Event, p: Pattern, idxM: number) {
                         tabindex="0"
                         type="number"
                         class="opacity-0 absolute inset-0 peer"
-                        v-model="p.notePos[idxM]![m.cursorPos.findIndex(cp => cp === idxC)]"
+                        v-model="m.notes[m.cursorPos!.findIndex(cp => cp === idxC)]"
                       />
                       <div
                         class="flex italic text-xs text-center justify-center border-l border-cyan-400 peer-focus:ring-0 peer-focus:bg-lime-700 peer-focus:text-lime-200"
