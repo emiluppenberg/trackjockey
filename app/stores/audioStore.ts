@@ -87,7 +87,7 @@ export const useAudioStore = defineStore("audioStore", () => {
       velNode.disconnect();
       srcNode.disconnect();
       if (p_srcNodes.has(srcNode)) p_srcNodes.delete(srcNode);
-    } catch(e) {
+    } catch (e) {
       console.log("error ", e);
     }
   }
@@ -106,7 +106,7 @@ export const useAudioStore = defineStore("audioStore", () => {
     isPlaying.value = true;
     let nextNoteTime = ctx.value!.currentTime;
     const scheduleAhead = 0.2; // s
-    
+
     const loop = async () => {
       if (!isPlaying.value) return;
 
@@ -145,16 +145,29 @@ export const useAudioStore = defineStore("audioStore", () => {
       if (!note) continue;
       if (note.pos64 !== cursor.value) continue;
 
-      scheduleNote(p, note, noteLen, cycleStart, _currentMeasure, _currentPos);
+      scheduleNote(
+        t,
+        p,
+        note,
+        noteLen,
+        cycleStart,
+        _currentMeasure,
+        _currentPos
+      );
     }
 
     let elapsedMeasures = t.figure!.patterns.filter(
-      (p) => p.currentMeasure > t.currentMeasure
+      (p) => p.currentMeasure !== t.currentMeasure
     );
 
     if (elapsedMeasures.length === t.figure!.patterns.length) {
-      t.currentMeasure++;
+      let _nextMeasure;
+
+      if (t.nextMeasures.length > 0) _nextMeasure = t.nextMeasures.pop();
+      if (_nextMeasure) t.currentMeasure = _nextMeasure;
+      else t.currentMeasure++;
     }
+
     if (t.currentMeasure === t.figure!.measureCount) {
       t.figure!.patterns.forEach((p) => (p.currentMeasure = 0));
       t.currentMeasure = 0;
@@ -162,6 +175,7 @@ export const useAudioStore = defineStore("audioStore", () => {
   }
 
   function scheduleNote(
+    t: Track,
     p: Pattern,
     note: Note,
     noteLen: number,
@@ -169,9 +183,18 @@ export const useAudioStore = defineStore("audioStore", () => {
     _currentMeasure: number,
     _currentPos: number
   ) {
+    let nextMeasure;
+
+    if (t.nextMeasures.length > 0) {
+      if (_currentPos + 1 > p.notePos[_currentMeasure]!.length) {
+        nextMeasure = t.nextMeasures[t.nextMeasures.length - 1];
+      }
+    }
+
     const startTime = cycleStart;
     const stopTime = getNextNoteStopTime(
       p,
+      nextMeasure,
       _currentMeasure,
       _currentPos,
       cycleStart,
@@ -196,13 +219,16 @@ export const useAudioStore = defineStore("audioStore", () => {
 
     p.currentPos++;
     if (p.currentPos === p.notePos[_currentMeasure]!.length) {
-      p.currentMeasure++;
+      if (nextMeasure) p.currentMeasure = nextMeasure;
+      else p.currentMeasure++;
+
       p.currentPos = 0;
     }
   }
 
   function getNextNoteStopTime(
     p: Pattern,
+    nextMeasure: number | undefined,
     _currentMeasure: number,
     _currentPos: number,
     cycleStart: number,
@@ -211,6 +237,16 @@ export const useAudioStore = defineStore("audioStore", () => {
     let next_mOffset;
     let next_nOffset;
     let note: Note;
+
+    if (nextMeasure) {
+      if (p.notePos[nextMeasure]!.length > _currentPos + 1)
+        note = p.notePos[nextMeasure]![_currentPos + 1]!;
+      else note = p.notePos[nextMeasure]![0]!;
+
+      next_mOffset = noteLen * nextMeasure * 64;
+      next_nOffset = note.pos64 * noteLen;
+      return cycleStart + next_mOffset + next_nOffset;
+    }
 
     if (p.notePos[_currentMeasure]!.length > _currentPos + 1) {
       processedStop1.value++;
@@ -283,7 +319,9 @@ export const useAudioStore = defineStore("audioStore", () => {
     const perc2M1 = "---5:---5";
 
     const shi3M1 = "2---:--02";
-    const shi3M2 = "----:-2--";
+    const shi3M2 = "*";
+    const shi3M3 = "--2-:---2";
+    const shi3M4 = "*";
 
     const kick1P = new Pattern(
       samples.value.find((s) => s.name === "kick1.wav")!,
@@ -329,6 +367,8 @@ export const useAudioStore = defineStore("audioStore", () => {
     );
     shi3P.addMeasure(shi3M1);
     shi3P.addMeasure(shi3M2);
+    shi3P.addMeasure(shi3M3);
+    shi3P.addMeasure(shi3M4);
 
     const drums1 = new Figure(0, "drums1", "KeyA", [kick1P, hihat1P, snare1P]);
     const drums2 = new Figure(1, "drums2", "KeyS", [kick2P, snare2P, hihat2P]);

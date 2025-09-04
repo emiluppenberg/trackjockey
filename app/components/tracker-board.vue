@@ -26,9 +26,9 @@ function changeSoundKeyBind(e: KeyboardEvent, f: Figure) {
         class="w-[200px] h-[150px] border border-cyan-400 text-center select-none overflow-hidden grid bg-cyan-700 ml-1 mt-1"
       >
         <span
-          class="italic text-center text-4xl text-cyan-200 place-self-center mt-5"
+          class="text-center text-4xl text-cyan-200 place-self-center mt-5"
         >
-          undefined
+          MUTE
         </span>
         <input
           disabled

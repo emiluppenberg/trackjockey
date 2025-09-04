@@ -11,7 +11,7 @@ function checkNextMeasureIdxs(idxM: number): boolean {
 function checkCursor(p: Pattern, m: Measure, idxM: number, idxC: number) {
   if (audioStore.activeTrack!.currentMeasure !== idxM) return false;
 
-  const value = p.notePos[idxM]![m.formatPos.findIndex((fp) => fp === idxC)];
+  const value = p.notePos[idxM]![m.cursorPos.findIndex((cp) => cp === idxC)];
 
   if (!value) return false;
 
@@ -67,7 +67,7 @@ function checkCursor(p: Pattern, m: Measure, idxM: number, idxC: number) {
               'border-cyan-400': !checkNextMeasureIdxs(idxM),
               'border-lime-400': checkNextMeasureIdxs(idxM),
             }"
-            @click="() => (audioStore.activeTrack!.currentMeasure = idxM)"
+            @click="() => (audioStore.activeTrack!.setCurrentMeasure(idxM))"
             @click.right.prevent="() => audioStore.activeTrack!.nextMeasures.push(idxM)"
           >
             <!-- Velocity -->

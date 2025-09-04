@@ -6,7 +6,6 @@ const ctx = audioStore.ctx!;
 const tracker = audioStore.tracker!;
 
 function changeTrackerBpm(e: Event) {
-  // TODO Change input to number
   const element = e.target as HTMLInputElement;
   const value = element.value;
 
@@ -14,7 +13,6 @@ function changeTrackerBpm(e: Event) {
 }
 
 function changeTracksLength(e: Event) {
-  // TODO Change input to number
   const value = (e.target as HTMLInputElement).value;
 
   if (Number(value)) {
@@ -32,7 +30,6 @@ function changeTracksLength(e: Event) {
 
     if (tracker.tracks.length < len) {
       for (let i = tracker.tracks.length; i < len; i++) {
-        // Make nicer
         tracker.tracks.push(new Track(ctx));
       }
     }
@@ -53,7 +50,7 @@ function changeTrackFigure(e: KeyboardEvent, t: Track) {
 
   if (f) {
     if (t.figure) {
-      t.figure.patterns.forEach((p) => p.velocityNode.disconnect());
+      t.figure.patterns.forEach((p) => p.disconnect());
     }
 
     t.currentMeasure = 0;
@@ -66,11 +63,6 @@ function changeTrackNextFigure(e: KeyboardEvent, t: Track) {
   if (e.code === "Tab") return;
 
   e.preventDefault();
-
-  if (e.code === "KeyQ") {
-    t.figure = undefined;
-    return;
-  }
 
   const f = audioStore.figures.find((_f) => _f.keyBind === e.code);
 
@@ -95,6 +87,10 @@ function pushTracksNextFigure() {
   const tracks = tracker.tracks.filter((t) => t.nextFigure);
 
   for (const t of tracks) {
+     if (t.figure) {
+      t.figure.patterns.forEach((p) => p.disconnect());
+    }
+
     t.currentMeasure = 0;
     t.figure = t.nextFigure;
     t.nextFigure = undefined;

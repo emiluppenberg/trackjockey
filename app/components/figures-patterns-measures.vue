@@ -91,7 +91,7 @@ function inputMeasureNotation(e: Event, p: Pattern, idxM: number) {
                         tabindex="0"
                         type="number"
                         class="opacity-0 absolute inset-0 peer"
-                        v-model="p.notePos[idxM]![m.formatPos.findIndex(fp => fp === idxC)]"
+                        v-model="p.notePos[idxM]![m.cursorPos.findIndex(cp => cp === idxC)]"
                       />
                       <div
                         class="flex italic text-xs text-center justify-center border-l border-cyan-400 peer-focus:ring-0 peer-focus:bg-lime-700 peer-focus:text-lime-200"

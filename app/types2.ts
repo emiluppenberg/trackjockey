@@ -85,22 +85,22 @@ export class Pattern {
 }
 
 export class Measure {
-  formatPos: number[]; // Contains the indices of notes[i] with a value - same length as patterns[x].notePos[i][j]
+  cursorPos: number[]; // Contains the indices of notes[i] with a value - same length as patterns[x].notePos[i][j]
   notes: string;
 
   constructor(notes: string) {
-    let formatPos: number[] = [];
+    let cursorPos: number[] = [];
 
     for (let i = 0; i < notes.length; i++) {
       const c = notes.charAt(i);
 
-      if (!isNaN(Number(c))) {
-        formatPos.push(i);
+      if (!isNaN(Number(c)) || c === "*") {
+        cursorPos.push(i);
       }
     }
 
     this.notes = notes;
-    this.formatPos = formatPos;
+    this.cursorPos = cursorPos;
   }
 }
 
@@ -148,8 +148,32 @@ export class Track {
     this.mixer.disconnect();
 
     if (this.figure) {
-      this.figure.patterns.forEach((p) => p.velocityNode.disconnect());
+      this.figure.patterns.forEach((p) => {
+        p.velocityNode.disconnect();
+        p.srcNodes.forEach((s) => {
+          s.stop();
+          s.disconnect();
+        });
+        p.srcNodes.clear();
+      });
     }
+  }
+
+  setCurrentMeasure(idxM: number) {
+    if (this.figure) {
+      this.figure.patterns.forEach((p) => {
+        // Find next note in next measure adjusting for current pos64
+        p.currentPos = p.notePos[idxM]!.findIndex(
+          (n) =>
+            n.pos64 > p.notePos[p.currentMeasure]![p.currentPos]!.pos64 ||
+            p.notePos[idxM]!.length - 1
+        );
+
+        p.currentMeasure = idxM;
+      });
+    }
+
+    this.currentMeasure = idxM;
   }
 }
 
@@ -234,9 +258,10 @@ export function initializeNotes64(notes: string): Note[] {
   for (let i = 0; i < _notes.length; i++) {
     const c = _notes.charAt(i);
 
-    if (!isNaN(Number(c))) {
+    if (!isNaN(Number(c)))
       notes64.push({ velocity: Number(c), pitch: 0, pos64: idx });
-    }
+
+    if (c === "*") notes64.push({ velocity: -1, pitch: 0, pos64: idx });
 
     idx += step;
   }
