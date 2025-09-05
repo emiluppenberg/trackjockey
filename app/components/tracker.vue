@@ -37,9 +37,10 @@ onMounted(() => {
 
 <template>
   <!-- Tracker.vue -->
-  <div class="flex flex-col w-[1850px] h-auto">
-    <TrackerBoard class="h-auto"></TrackerBoard>
+  <div class="flex flex-col w-full h-auto">
+    <TrackerFigureBoard class="h-auto mb-7"></TrackerFigureBoard>
+    <TrackerOptions></TrackerOptions>
     <TrackerList></TrackerList>
-    <TrackerActiveFigure class="h-auto"></TrackerActiveFigure>
+    <TrackerActive class="h-auto"></TrackerActive>
   </div>
 </template>

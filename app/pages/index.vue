@@ -3,19 +3,16 @@ const audioStore = useAudioStore();
 </script>
 
 <template>
-  <div class="flex flex-col w-screen h-auto overflow-y-scroll">
-    <button class="w-full border-b my-1" @click="audioStore.consoleLog">
-      Log
-    </button>
+  <div class="flex flex-col w-auto h-auto overflow-y-scroll">
     <Tracker
       v-if="audioStore.ctx && audioStore.tracker"
-      class="mx-[30px] my-[50px] border border-cyan-400 rounded-lg"
+      class="pl-[30px] mt-[50px]"
     ></Tracker>
     <Mixer
       v-if="audioStore.ctx && audioStore.tracker"
-      class="mx-[30px]"
+      class="pl-[30px]"
     ></Mixer>
-    <Figures class="mx-[30px] my-[50px]"></Figures>
-    <Sampler v-if="audioStore.ctx" class="mx-[30px]"></Sampler>
+    <Figures class="px-[30px] my-[50px]"></Figures>
+    <Sampler v-if="audioStore.ctx" class="px-[30px]"></Sampler>
   </div>
 </template>

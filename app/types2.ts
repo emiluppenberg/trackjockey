@@ -109,14 +109,31 @@ export class Measure {
 }
 
 export class Tracker {
-  bpm: number;
   tracks: Track[];
   master: Mixer;
 
-  constructor(bpm: number, ctx: AudioContext) {
-    this.bpm = bpm;
-    this.tracks = [new Track(ctx)];
+  constructor(
+    public bpm: number,
+    public ctx: AudioContext
+  ) {
+    this.tracks = [new Track(ctx, this)];
     this.master = new Mixer(ctx);
+  }
+
+  setLength(len: number) {
+    if (this.tracks.length > len) {
+      for (let i = this.tracks.length; i > len; i--) {
+        const t = this.tracks[i - 1]!;
+        t.disconnect();
+        this.tracks.pop();
+      }
+    }
+
+    if (this.tracks.length < len) {
+      for (let i = this.tracks.length; i < len; i++) {
+        this.tracks.push(new Track(this.ctx, this));
+      }
+    }
   }
 }
 
@@ -127,6 +144,7 @@ export class Track {
 
   constructor(
     public ctx: AudioContext,
+    public tracker: Tracker,
     public mute: boolean = false,
     public currentMeasure: number = 0,
     public nextMeasures: number[] = []
@@ -139,7 +157,7 @@ export class Track {
 
     this.mixer.connect();
     this.mixer.gainNode.disconnect();
-    this.mixer.gainNode.connect(tracker.master.pannerNode);
+    this.mixer.gainNode.connect(this.tracker.master.pannerNode);
 
     for (const p of this.figure.patterns) {
       p.velocityNode.disconnect();
@@ -168,13 +186,11 @@ export class Track {
       this.figure.patterns.forEach((p) => {
         // Find next note in new measure adjusting for cursor position
         if (p.measures[idxM]!.notes) {
-          
           p.currentPos = p.measures[idxM]!.notes!.findIndex(
             (n) => n.pos64 > cursor64
           );
 
           if (p.currentPos < 0) p.currentPos = 0;
-
         } else p.currentPos = 0;
 
         p.currentMeasure = idxM;
@@ -182,6 +198,27 @@ export class Track {
     }
 
     this.currentMeasure = idxM;
+  }
+
+  changeFigure(f: Figure) {
+    if (this.figure) {
+      this.figure.patterns.forEach((p) => p.disconnect());
+    }
+
+    this.currentMeasure = 0;
+    this.figure = f.clone(this.ctx);
+    this.connect(this.tracker);
+  }
+
+  pushNextFigure() {
+    if (this.figure) {
+      this.figure.patterns.forEach((p) => p.disconnect());
+    }
+
+    this.currentMeasure = this.nextFigure!.measureCount - 1;
+    this.figure = this.nextFigure;
+    this.nextFigure = undefined;
+    this.connect(this.tracker);
   }
 }
 
@@ -197,7 +234,15 @@ export class Mixer {
     this.pitch = 0;
     this.pannerNode = ctx.createStereoPanner();
     this.gainNode = ctx.createGain();
-    this.filterNodes = [];
+
+    this.filterNodes = [
+      ctx.createBiquadFilter(),
+      ctx.createBiquadFilter(),
+      ctx.createBiquadFilter(),
+      ctx.createBiquadFilter(),
+    ];
+    this.filterNodes.forEach((f) => (f.frequency.value = 24000));
+
     this.compressorNode = ctx.createDynamicsCompressor();
     this.compressorNode.attack.value = 0.05;
     this.compressorNode.knee.value = 0;
@@ -262,7 +307,6 @@ export function initializeNotes64(notes: string): Note[] {
   const step = 64 / len;
   let idx = 0;
   let notes64: Note[] = [];
-
   for (let i = 0; i < _notes.length; i++) {
     const c = _notes.charAt(i);
 
@@ -274,9 +318,31 @@ export function initializeNotes64(notes: string): Note[] {
     idx += step;
   }
 
+  console.log(notes64);
   return notes64;
 }
 
+export function handleScrollAudioParam(e: WheelEvent, model: AudioParam) {
+  const element = e.target as HTMLInputElement;
+  const step = Number(element.step);
+
+  if (e.deltaY < 0) model.value = Math.round((model.value + step) * 10) / 10;
+  if (e.deltaY > 0) model.value = Math.round((model.value - step) * 10) / 10;
+
+  if (model.value % 1 !== 0) element.value = model.value.toFixed(1);
+  else element.value = model.value.toString();
+}
+
+export function handleScrollValue(e: WheelEvent) {
+  const element = e.target as HTMLInputElement;
+  let value = 0;
+
+  if (e.deltaY < 0) value = Number(element.value) + Number(element.step);
+  if (e.deltaY > 0) value = Number(element.value) - Number(element.step);
+
+  element.value = value.toString();
+  element.dispatchEvent(new Event("input", { bubbles: true }));
+}
 // export function getPitchIndex(idxC: number, m: string): Note {
 //   let idxP = 0;
 

@@ -4,37 +4,11 @@ import { Track } from "~/types2";
 const audioStore = useAudioStore();
 const ctx = audioStore.ctx!;
 const tracker = audioStore.tracker!;
+const tracksLength = ref<number>(audioStore.tracker!.tracks.length);
 
-function changeTrackerBpm(e: Event) {
-  const element = e.target as HTMLInputElement;
-  const value = element.value;
-
-  if (Number(value)) tracker.bpm = Number(value);
-}
-
-function changeTracksLength(e: Event) {
-  const value = (e.target as HTMLInputElement).value;
-
-  if (Number(value)) {
-    const len = Number(value);
-
-    if (tracker.tracks.length > len) {
-      for (let i = tracker.tracks.length; i > len; i--) {
-        const t = tracker.tracks[i - 1]!;
-
-        t.disconnect();
-        
-        tracker.tracks.pop();
-      }
-    }
-
-    if (tracker.tracks.length < len) {
-      for (let i = tracker.tracks.length; i < len; i++) {
-        tracker.tracks.push(new Track(ctx));
-      }
-    }
-  }
-}
+watch(tracksLength, (newLength) => {
+  if (newLength) tracker.setLength(newLength);
+});
 
 function changeTrackFigure(e: KeyboardEvent, t: Track) {
   if (e.code === "Tab") return;
@@ -48,15 +22,7 @@ function changeTrackFigure(e: KeyboardEvent, t: Track) {
 
   const f = audioStore.figures.find((_f) => _f.keyBind === e.code);
 
-  if (f) {
-    if (t.figure) {
-      t.figure.patterns.forEach((p) => p.disconnect());
-    }
-
-    t.currentMeasure = 0;
-    t.figure = f.clone(ctx);
-    t.connect(tracker);
-  }
+  if (f) t.changeFigure(f);
 }
 
 function changeTrackNextFigure(e: KeyboardEvent, t: Track) {
@@ -66,9 +32,7 @@ function changeTrackNextFigure(e: KeyboardEvent, t: Track) {
 
   const f = audioStore.figures.find((_f) => _f.keyBind === e.code);
 
-  if (f) {
-    t.nextFigure = f.clone(ctx);
-  }
+  if (f) t.nextFigure = f.clone(ctx);
 }
 
 function focusTrackNextFigure(e: MouseEvent, idxT: number, t: Track) {
@@ -82,91 +46,52 @@ function focusTrackNextFigure(e: MouseEvent, idxT: number, t: Track) {
     if (element) element.focus();
   });
 }
-
-function pushTracksNextFigure() {
-  const tracks = tracker.tracks.filter((t) => t.nextFigure);
-
-  for (const t of tracks) {
-     if (t.figure) {
-      t.figure.patterns.forEach((p) => p.disconnect());
-    }
-
-    t.currentMeasure = 0;
-    t.figure = t.nextFigure;
-    t.nextFigure = undefined;
-    t.connect(tracker);
-  }
-}
 </script>
 
 <template>
-  <div class="flex">
-    <!-- Options -->
-    <div id="tracker-options" class="flex flex-col w-[100px] min-h-[80px]">
-      <input
-        type="number"
-        :value="tracker.tracks.length"
-        class="w-[100px] h-[40px] border-r border-b border-white text-center text-3xl text-white bg-sky-400 focus:bg-sky-200"
-        @change="(e) => changeTracksLength(e)"
-      />
-      <input
-        type="text"
-        class="w-[100px] h-[40px] border-r border-white text-center text-3xl text-white bg-sky-400 focus:bg-sky-200"
-        :value="tracker.bpm.toString()"
-        @change="(e) => changeTrackerBpm(e)"
-      />
-      <button
-        v-if="tracker.tracks.some((t) => t.nextFigure)"
-        class="w-[100px] h-[40px] border-r border-t border-white text-center text-xl text-white bg-sky-400 focus:bg-sky-200"
-        @click="pushTracksNextFigure"
-      >
-        PUSH ->
-      </button>
-    </div>
-    <!-- Track list -->
-    <div id="tracker-list" class="flex w-full min-h-[80px] overflow-x-auto">
+  <div id="tracker-list" class="flex min-h-[100px]">
+    <div
+      id="tracker-list-items"
+      class="flex w-full overflow-x-auto border-t border-b border-cyan-400 rounded-tl-xl"
+    >
       <div
         :id="`track-${idxT}`"
         v-for="(t, idxT) in tracker.tracks"
         :key="idxT"
-        class="max-w-[150px] min-w-[150px] min-h-[80px] flex flex-col border-r border-cyan-400"
+        class="max-w-[150px] min-w-[150px] min-h-[100px] max-h-[150px] flex flex-col border-r border-cyan-400 first:border-l first:rounded-tl-xl"
         :class="{
-          'bg-cyan-700': t !== audioStore.activeTrack,
-          'bg-lime-700': t === audioStore.activeTrack,
+          'bg-sky-800/10': t !== audioStore.activeTrack,
+          'bg-indigo-700/20': t === audioStore.activeTrack,
         }"
       >
         <button
-          class="w-full min-h-[80px] flex flex-col justify-center items-center overflow-hidden select-none"
+          class="w-full min-h-[100px] grow flex flex-col text-3xl text-center justify-center items-center overflow-hidden select-none"
+          :class="{
+            'text-green-400': t !== audioStore.activeTrack,
+            'text-lime-200': t === audioStore.activeTrack,
+          }"
           @focus="audioStore.activeTrack = t"
           @keydown="(e) => changeTrackFigure(e, t)"
           @click.right="(e) => focusTrackNextFigure(e, idxT, t)"
         >
-          <label
-            class="text-3xl text-center"
-            :class="{
-              'text-cyan-200': t !== audioStore.activeTrack,
-              'text-lime-200': t === audioStore.activeTrack,
-            }"
-          >
-            {{ (tracker.tracks.indexOf(t) + 1).toString() }}
-          </label>
-          <div
-            class="max-w-[130px] italic text-2xl text-center truncate pointer-events-none focus:outline-none"
-            :class="{
-              'text-cyan-200': t !== audioStore.activeTrack,
-              'text-lime-200': t === audioStore.activeTrack,
-            }"
-          >
+          {{ idxT + 1 }}
+          <label class="italic hover:cursor-pointer">
             {{ t.figure?.name || "undefined" }}
-          </div>
+          </label>
         </button>
         <input
           tabindex="-1"
           v-if="t.nextFigure"
           :id="`track-${idxT}-next-figure`"
-          class="w-full h-[40px] flex flex-col justify-center text-xl text-center truncate pointer-events-none focus:outline-indigo-200 bg-slate-400 text-lime-300"
-          :value="t.nextFigure.name"
+          class="w-full h-[50px] text-md text-center border-t border-cyan-400 focus:outline-emerald-300 bg-transparent hover:cursor-pointer"
+          :class="{
+            'text-green-400': t !== audioStore.activeTrack,
+            'text-lime-200': t === audioStore.activeTrack,
+          }"
+          :value="`PUSH (${t.nextFigure.name})`"
+          @focus="audioStore.activeTrack = t"
           @keydown="(e) => changeTrackNextFigure(e, t)"
+          @click.right="(e) => focusTrackNextFigure(e, idxT, t)"
         />
       </div>
     </div>

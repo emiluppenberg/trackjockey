@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { melToX, xToHz } from "~/types2";
+import { xToHz, handleScrollAudioParam, selectAllText } from "~/types2";
 
 const audioStore = useAudioStore();
 const ctx = audioStore.ctx!;
 const fCanvas = ref<HTMLCanvasElement>();
 const aCanvas = ref<HTMLCanvasElement>();
+
+const activeFilterIdx = ref<number>(0);
 
 const canvasWidth = 400;
 const canvasHeight = 200;
@@ -15,6 +17,20 @@ let phaseResponse = new Float32Array(canvasWidth);
 
 let array = new Uint8Array(audioStore.eq_fftSize);
 
+const filterTypeRefs = ref<string[]>(
+  audioStore.activeMixer!.filterNodes.map((f) => f.type)
+);
+
+watch(
+  () => audioStore.activeMixer,
+  (newMixer) => {
+    if (newMixer) {
+      activeFilterIdx.value = 0;
+      filterTypeRefs.value = newMixer.filterNodes.map(f => f.type);
+      drawFilter();
+    }
+  }
+);
 watch(
   () => audioStore.isPlaying,
   (value) => {
@@ -26,14 +42,24 @@ onMounted(() => {
   initFreqHz();
 });
 
+function changeFilterType(e: Event, activeFilterIdx: number) {
+  const element = e.target as HTMLInputElement;
+  audioStore.activeMixer!.filterNodes[activeFilterIdx]!.type =
+    element.value as BiquadFilterType;
+  filterTypeRefs.value[activeFilterIdx] = element.value;
+  console.log(filterTypeRefs.value[activeFilterIdx]);
+}
+
 function initFreqHz() {
   for (let i = 0; i < canvasWidth; i++) {
     freqHz[i] = xToHz(i, canvasWidth);
   }
 }
 
-function drawFilter(f: BiquadFilterNode) {
+function drawFilter() {
   if (!fCanvas.value) return;
+  const f = audioStore.activeMixer!.filterNodes[activeFilterIdx.value];
+  if (!f) return;
 
   const canCtx = fCanvas.value.getContext("2d")!;
   const w = fCanvas.value.width;
@@ -62,20 +88,6 @@ function drawFilter(f: BiquadFilterNode) {
   canCtx.strokeStyle = `rgb(50 50 50)`;
 
   canCtx.stroke();
-}
-
-function addFilter() {
-  const filter = ctx.createBiquadFilter();
-  filter.frequency.value = 24000; // Default
-  filter.type = "lowpass"; // Default
-
-  audioStore.activeMixer!.filterNodes.push(filter);
-  audioStore.activeMixer!.connect();
-}
-
-function removeFilter(idxF: number) {
-  audioStore.activeMixer!.filterNodes.splice(idxF, 1);
-  audioStore.activeMixer!.connect();
 }
 
 function drawAudio() {
@@ -114,94 +126,189 @@ function drawAudio() {
 </script>
 
 <template>
-  <div class="flex w-auto h-auto bg-slate-800 items-center border-l">
-    <!-- Filters -->
-    <div v-if="audioStore.activeMixer" class="flex flex-col min-h-[200px]">
-      <button class="bg-emerald-600 border" @click="addFilter">+</button>
-      <div
-        :id="`filter-${idxF}`"
-        v-for="(f, idxF) in audioStore.activeMixer.filterNodes"
-        class="flex justify-center items-center"
-      >
-        <div class="flex flex-col items-center">
-          <label>Type</label>
-          <select
-            v-model="f.type"
-            @change="drawFilter(f)"
-            @focus="drawFilter(f)"
-          >
-            <option :value="'lowpass' as BiquadFilterType">Lowpass</option>
-            <option :value="'highpass' as BiquadFilterType">Highpass</option>
-            <option :value="'bandpass' as BiquadFilterType">Bandpass</option>
-            <option :value="'lowshelf' as BiquadFilterType">Lowshelf</option>
-            <option :value="'highshelf' as BiquadFilterType">Highshelf</option>
-            <option :value="'peaking' as BiquadFilterType">Peaking</option>
-            <option :value="'notch' as BiquadFilterType">Notch</option>
-          </select>
-        </div>
-        <div class="flex flex-col items-center">
-          <label>Frequency</label>
-          <input
-            :id="`filter-${idxF}-frequency`"
-            type="number"
-            step="100"
-            v-model="f.frequency.value"
-            class="w-[100px] mx-1 text-center"
-            @input="drawFilter(f)"
-            @focus="drawFilter(f)"
-          />
-        </div>
-        <div class="flex flex-col items-center">
-          <label>Gain</label>
-          <input
-            :id="`filter-${idxF}-gain`"
-            type="number"
-            step="1"
-            v-model="f.gain.value"
-            class="w-[100px] mx-1 text-center"
-            @input="drawFilter(f)"
-            @focus="drawFilter(f)"
-          />
-        </div>
-        <div class="flex flex-col items-center">
-          <label>Detune</label>
-          <input
-            :id="`filter-${idxF}-detune`"
-            type="number"
-            step="10"
-            v-model="f.detune.value"
-            class="w-[100px] mx-1 text-center"
-            @input="drawFilter(f)"
-            @focus="drawFilter(f)"
-          />
-        </div>
-        <div class="flex flex-col items-center">
-          <label>Q</label>
-          <input
-            :id="`filter-${idxF}-q`"
-            type="number"
-            step="0.1"
-            v-model="f.Q.value"
-            class="w-[100px] mx-1 text-center"
-            @input="drawFilter(f)"
-            @focus="drawFilter(f)"
-          />
-        </div>
-        <button
-          class="w-[50px] bg-red-600 border text-center me-1"
-          @click="removeFilter(idxF)" 
-        >
-          -
-        </button>
-      </div>
-    </div>
+  <div
+    class="flex flex-col border-r border-cyan-400"
+    :style="{ width: `${canvasWidth}px` }"
+  >
     <!-- Visual -->
     <div
-      class="relative bg-black"
+      class="relative bg-transparent"
       :style="{ width: `${canvasWidth}px`, height: `${canvasHeight}px` }"
     >
       <canvas ref="aCanvas" class="w-full h-full absolute inset-0"></canvas>
       <canvas ref="fCanvas" class="w-full h-full absolute inset-0"></canvas>
+    </div>
+    <!-- Select filters -->
+    <div class="flex h-[50px] border-b border-t border-cyan-400">
+      <button
+        v-for="(f, idxF) in filterTypeRefs"
+        class="w-[100px] border-r border-cyan-400 text-md text-cyan-400 flex items-center justify-center"
+        :class="{
+          'bg-sky-800/20 text-cyan-400': idxF !== activeFilterIdx,
+          'bg-indigo-700/20 text-lime-200': idxF === activeFilterIdx,
+        }"
+        @click="
+          () => {
+            console.log(f);
+            activeFilterIdx = idxF;
+            drawFilter();
+          }
+        "
+      >
+        <span class="pointer-events-none">{{ f }}</span>
+      </button>
+    </div>
+    <!-- Config filters -->
+    <div
+      id="filter-options"
+      v-if="audioStore.activeMixer!.filterNodes[activeFilterIdx]"
+      class="flex justify-center h-[50px] bg-sky-800/20"
+    >
+      <div
+        class="h-[50px] w-[100px] flex flex-col text-xs text-center justify-center border-r border-cyan-400 hover:cursor-pointer"
+      >
+        <span>Type</span>
+        <select
+          class="h-[30px] text-center text-lg text-cyan-400 bg-transparent hover:cursor-pointer"
+          v-model="audioStore.activeMixer!.filterNodes[activeFilterIdx]!.type"
+          @change="
+            (e) => {
+              changeFilterType(e, activeFilterIdx);
+              drawFilter();
+            }
+          "
+          @focus="drawFilter()"
+        >
+          <option class="bg-slate-800" value="lowpass">Lowpass</option>
+          <option class="bg-slate-800" value="highpass">Highpass</option>
+          <option class="bg-slate-800" value="bandpass">Bandpass</option>
+          <option class="bg-slate-800" value="lowshelf">Lowshelf</option>
+          <option class="bg-slate-800" value="highshelf">Highshelf</option>
+          <option class="bg-slate-800" value="peaking">Peaking</option>
+          <option class="bg-slate-800" value="notch">Notch</option>
+        </select>
+      </div>
+      <div
+        class="h-[50px] w-[100px] flex flex-col text-xs text-center justify-center border-r border-cyan-400 hover:cursor-pointer"
+      >
+        <span>Frequency</span>
+        <input
+          id="filter-frequency"
+          type="number"
+          step="100"
+          v-model="
+            audioStore.activeMixer!.filterNodes[activeFilterIdx]!.frequency
+              .value
+          "
+          class="h-[30px] text-center text-xl text-cyan-400 bg-transparent hover:cursor-pointer"
+          @wheel.prevent="
+            (e) => {
+              handleScrollAudioParam(
+                e,
+                audioStore.activeMixer!.filterNodes[activeFilterIdx]!.frequency
+              );
+              drawFilter();
+            }
+          "
+          @input="drawFilter()"
+          @focus="
+            (e) => {
+              drawFilter();
+              selectAllText(e);
+            }
+          "
+        />
+      </div>
+      <div
+        class="h-[50px] w-[66px] flex flex-col text-xs text-center justify-center border-r border-cyan-400 hover:cursor-pointer"
+      >
+        Gain
+        <input
+          id="filter-gain"
+          type="number"
+          step="1"
+          v-model="
+            audioStore.activeMixer!.filterNodes[activeFilterIdx]!.gain.value
+          "
+          class="h-[30px] text-center text-xl text-cyan-400 bg-transparent hover:cursor-pointer"
+          @wheel.prevent="
+            (e) => {
+              handleScrollAudioParam(
+                e,
+                audioStore.activeMixer!.filterNodes[activeFilterIdx]!.gain
+              );
+              drawFilter();
+            }
+          "
+          @input="drawFilter()"
+          @focus="
+            (e) => {
+              drawFilter();
+              selectAllText(e);
+            }
+          "
+        />
+      </div>
+      <div
+        class="h-[50px] w-[66px] flex flex-col text-xs text-center justify-center border-r border-cyan-400 hover:cursor-pointer"
+      >
+        Detune
+        <input
+          id="filter-detune"
+          type="number"
+          step="10"
+          v-model="
+            audioStore.activeMixer!.filterNodes[activeFilterIdx]!.detune.value
+          "
+          class="h-[30px] text-center text-xl text-cyan-400 bg-transparent hover:cursor-pointer"
+          @wheel.prevent="
+            (e) => {
+              handleScrollAudioParam(
+                e,
+                audioStore.activeMixer!.filterNodes[activeFilterIdx]!.detune
+              );
+              drawFilter();
+            }
+          "
+          @input="drawFilter()"
+          @focus="
+            (e) => {
+              drawFilter();
+              selectAllText(e);
+            }
+          "
+        />
+      </div>
+      <div
+        class="h-[50px] w-[66px] flex flex-col text-xs text-center justify-center hover:cursor-pointer"
+      >
+        Q
+        <input
+          id="filter-q"
+          type="number"
+          step="1"
+          v-model="
+            audioStore.activeMixer!.filterNodes[activeFilterIdx]!.Q.value
+          "
+          class="h-[30px] text-center text-xl text-cyan-400 bg-transparent hover:cursor-pointer"
+          @wheel.prevent="
+            (e) => {
+              handleScrollAudioParam(
+                e,
+                audioStore.activeMixer!.filterNodes[activeFilterIdx]!.Q
+              );
+              drawFilter();
+            }
+          "
+          @input="drawFilter()"
+          @focus="
+            (e) => {
+              drawFilter();
+              selectAllText(e);
+            }
+          "
+        />
+      </div>
     </div>
   </div>
 </template>
