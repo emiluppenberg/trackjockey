@@ -9,7 +9,7 @@ const audioStore = useAudioStore();
       class="pl-[30px] mt-[50px]"
     ></Tracker>
     <Mixer
-      v-if="audioStore.ctx && audioStore.tracker"
+      v-if="audioStore.ctx && audioStore.activeMixer"
       class="pl-[30px]"
     ></Mixer>
     <Figures class="px-[30px] my-[50px]"></Figures>

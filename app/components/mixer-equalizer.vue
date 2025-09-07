@@ -26,7 +26,7 @@ watch(
   (newMixer) => {
     if (newMixer) {
       activeFilterIdx.value = 0;
-      filterTypeRefs.value = newMixer.filterNodes.map(f => f.type);
+      filterTypeRefs.value = newMixer.filterNodes.map((f) => f.type);
       drawFilter();
     }
   }
@@ -165,11 +165,11 @@ function drawAudio() {
       class="flex justify-center h-[50px] bg-sky-800/20"
     >
       <div
-        class="h-[50px] w-[100px] flex flex-col text-xs text-center justify-center border-r border-cyan-400 hover:cursor-pointer"
+        class="relative h-[50px] w-[100px] pt-1 flex flex-col text-xs text-center border-r border-cyan-400 hover:cursor-pointer"
       >
         <span>Type</span>
         <select
-          class="h-[30px] text-center text-lg text-cyan-400 bg-transparent hover:cursor-pointer"
+          class="absolute inset-0 pt-4 h-full text-center text-lg text-cyan-400 bg-transparent hover:cursor-pointer"
           v-model="audioStore.activeMixer!.filterNodes[activeFilterIdx]!.type"
           @change="
             (e) => {
@@ -189,7 +189,7 @@ function drawAudio() {
         </select>
       </div>
       <div
-        class="h-[50px] w-[100px] flex flex-col text-xs text-center justify-center border-r border-cyan-400 hover:cursor-pointer"
+        class="relative h-[50px] w-[100px] pt-1 flex flex-col text-xs text-center border-r border-cyan-400 hover:cursor-pointer"
       >
         <span>Frequency</span>
         <input
@@ -200,7 +200,7 @@ function drawAudio() {
             audioStore.activeMixer!.filterNodes[activeFilterIdx]!.frequency
               .value
           "
-          class="h-[30px] text-center text-xl text-cyan-400 bg-transparent hover:cursor-pointer"
+          class="absolute inset-0 pt-4 h-full text-center text-xl text-cyan-400 bg-transparent hover:cursor-pointer"
           @wheel.prevent="
             (e) => {
               handleScrollAudioParam(
@@ -208,6 +208,7 @@ function drawAudio() {
                 audioStore.activeMixer!.filterNodes[activeFilterIdx]!.frequency
               );
               drawFilter();
+              selectAllText(e);
             }
           "
           @input="drawFilter()"
@@ -220,7 +221,7 @@ function drawAudio() {
         />
       </div>
       <div
-        class="h-[50px] w-[66px] flex flex-col text-xs text-center justify-center border-r border-cyan-400 hover:cursor-pointer"
+        class="relative h-[50px] w-[66px] pt-1 flex flex-col text-xs text-center border-r border-cyan-400 hover:cursor-pointer"
       >
         Gain
         <input
@@ -230,7 +231,7 @@ function drawAudio() {
           v-model="
             audioStore.activeMixer!.filterNodes[activeFilterIdx]!.gain.value
           "
-          class="h-[30px] text-center text-xl text-cyan-400 bg-transparent hover:cursor-pointer"
+          class="absolute inset-0 pt-4 h-full text-center text-xl text-cyan-400 bg-transparent hover:cursor-pointer"
           @wheel.prevent="
             (e) => {
               handleScrollAudioParam(
@@ -238,6 +239,7 @@ function drawAudio() {
                 audioStore.activeMixer!.filterNodes[activeFilterIdx]!.gain
               );
               drawFilter();
+              selectAllText(e);
             }
           "
           @input="drawFilter()"
@@ -250,7 +252,7 @@ function drawAudio() {
         />
       </div>
       <div
-        class="h-[50px] w-[66px] flex flex-col text-xs text-center justify-center border-r border-cyan-400 hover:cursor-pointer"
+        class="relative h-[50px] w-[66px] pt-1 flex flex-col text-xs text-center border-r border-cyan-400 hover:cursor-pointer"
       >
         Detune
         <input
@@ -260,7 +262,7 @@ function drawAudio() {
           v-model="
             audioStore.activeMixer!.filterNodes[activeFilterIdx]!.detune.value
           "
-          class="h-[30px] text-center text-xl text-cyan-400 bg-transparent hover:cursor-pointer"
+          class="absolute inset-0 pt-4 h-full text-center text-xl text-cyan-400 bg-transparent hover:cursor-pointer"
           @wheel.prevent="
             (e) => {
               handleScrollAudioParam(
@@ -268,6 +270,7 @@ function drawAudio() {
                 audioStore.activeMixer!.filterNodes[activeFilterIdx]!.detune
               );
               drawFilter();
+              selectAllText(e);
             }
           "
           @input="drawFilter()"
@@ -280,7 +283,7 @@ function drawAudio() {
         />
       </div>
       <div
-        class="h-[50px] w-[66px] flex flex-col text-xs text-center justify-center hover:cursor-pointer"
+        class="relative h-[50px] w-[66px] pt-1 flex flex-col text-xs text-center hover:cursor-pointer"
       >
         Q
         <input
@@ -290,7 +293,7 @@ function drawAudio() {
           v-model="
             audioStore.activeMixer!.filterNodes[activeFilterIdx]!.Q.value
           "
-          class="h-[30px] text-center text-xl text-cyan-400 bg-transparent hover:cursor-pointer"
+          class="absolute inset-0 pt-4 h-full text-center text-xl text-cyan-400 bg-transparent hover:cursor-pointer"
           @wheel.prevent="
             (e) => {
               handleScrollAudioParam(
@@ -298,6 +301,7 @@ function drawAudio() {
                 audioStore.activeMixer!.filterNodes[activeFilterIdx]!.Q
               );
               drawFilter();
+              selectAllText(e);
             }
           "
           @input="drawFilter()"

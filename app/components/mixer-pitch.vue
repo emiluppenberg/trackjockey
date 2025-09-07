@@ -1,26 +1,41 @@
 <script setup lang="ts">
-import { handleScrollAudioParam, selectAllText } from '~/types2';
+import { handleScrollValue, selectAllText } from '~/types2';
 
 const audioStore = useAudioStore();
+
+function setPitch(e: Event) {
+  e.preventDefault();
+
+  const element = e.target as HTMLInputElement;
+  audioStore.activeMixer!.pitch = Number(element.value);
+  audioStore.activeMixer!.pitcherNode.parameters.get("pitch")!.value =
+    audioStore.activeMixer!.pitch;
+}
 </script>
 
 <template>
-    <div class="flex flex-col w-[100px] rounded-tl-xl rounded-bl-xl text-white">
-        <div
-        class="max-h-[50px] grow text-xs text-center border-b border-cyan-400 bg-sky-800/20 hover:cursor-pointer"
-        >
-        Pan
+    <div
+      class="flex flex-col text-white border-r border-cyan-400"
+    >
+      <div
+        class="bg-sky-800/20 relative h-[50px] w-[50px] pt-1 flex flex-col text-xs text-center border-b border-cyan-400 hover:cursor-pointer"
+      >
+        Pitch
         <input
-        id="pan"
-        type="number"
-        step="0.1"
-        min="-1"
-        max="1"
-        class="w-[100px] h-[30px] text-center text-3xl text-cyan-400 bg-transparent hover:cursor-pointer"
-        v-model="audioStore.activeMixer!.pannerNode.pan.value"
-        @wheel.prevent="(e) => handleScrollAudioParam(e, audioStore.activeMixer!.pannerNode.pan)"
-        @focus="(e) => selectAllText(e)"
+          id="pitch"
+          type="number"
+          step="1"
+          class="absolute inset-0 pt-4 h-full text-center text-xl text-cyan-400 bg-transparent hover:cursor-pointer"
+          :value="audioStore.activeMixer!.pitch"
+          @wheel.prevent="
+            (e) => {
+              handleScrollValue(e);
+              setPitch(e);
+            }
+          "
+          @input="(e) => setPitch(e)"
+          @focus="(e) => selectAllText(e)"
         />
       </div>
-    </div>
+      </div>
 </template>

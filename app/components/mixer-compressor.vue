@@ -1,6 +1,11 @@
 <script setup lang="ts">
-const audioStore = useAudioStore();
+import {
+  handleScrollValue,
+  handleScrollAudioParam,
+  selectAllText,
+} from "~/types2";
 
+const audioStore = useAudioStore();
 const cCanvas = ref<HTMLCanvasElement>();
 const aCanvas = ref<HTMLCanvasElement>();
 
@@ -9,6 +14,19 @@ let array = new Uint8Array(audioStore.comp_fftSize);
 const canvasWidth = 200;
 const canvasHeight = 200;
 
+const attackRef = ref<number>(
+  Math.round(audioStore.activeMixer!.compressorNode.attack.value * 1000)
+);
+
+watch(
+  () => attackRef.value,
+  (value) => {
+    if (value) {
+      audioStore.activeMixer!.compressorNode.attack.value = value / 1000;
+      drawCompressor(0);
+    }
+  }
+);
 watch(
   () => audioStore.isPlaying,
   (value) => {
@@ -37,7 +55,7 @@ function drawCompressor(outputY: number) {
   const kneeNorm = (comp.knee.value - DB_BOTTOM) / (DB_TOP - DB_BOTTOM);
   const kneeSpan = h / 2 - (1 - kneeNorm) * h;
 
-  const attackWidth = comp.attack.value * w * 10;
+  const attackWidth = comp.attack.value * w;
 
   const canCtx = cCanvas.value.getContext("2d")!;
   canCtx.clearRect(0, 0, w, h);
@@ -136,80 +154,160 @@ function drawAudio() {
 
 <template>
   <div
-    v-if="audioStore.activeMixer"
     id="mixer-compressor"
-    class="flex items-center bg-slate-800 border-l"
+    class="flex flex-col"
+    :style="{ width: `${canvasWidth}px` }"
   >
-    <div class="flex flex-col items-center">
-      <div id="compressor-threshold" class="flex flex-col items-center">
-        <label>Threshold</label>
-        <input
-          type="number"
-          step="1"
-          v-model="audioStore.activeMixer.compressorNode.threshold.value"
-          class="w-[100px] mx-1 text-center"
-          @change="drawCompressor(0)"
-        />
-      </div>
-      <div id="compressor-knee" class="flex flex-col items-center">
-        <label>Knee</label>
-        <input
-          type="number"
-          step="1"
-          v-model="audioStore.activeMixer.compressorNode.knee.value"
-          class="w-[100px] mx-1 text-center"
-          @change="drawCompressor(0)"
-        />
-      </div>
-      <div id="compressor-ratio" class="flex flex-col items-center">
-        <label>Ratio</label>
-        <input
-          type="number"
-          step="1"
-          v-model="audioStore.activeMixer.compressorNode.ratio.value"
-          class="w-[100px] mx-1 text-center"
-          @change="drawCompressor(0)"
-        />
-      </div>
-      <div id="compressor-attack" class="flex flex-col items-center">
-        <label>Attack</label>
-        <input
-          type="number"
-          step="0.001"
-          v-model="audioStore.activeMixer.compressorNode.attack.value"
-          class="w-[100px] mx-1 text-center"
-          @change="drawCompressor(0)"
-        />
-      </div>
-      <div id="compressor-release" class="flex flex-col items-center">
-        <label>Release</label>
-        <input
-          type="number"
-          step="100"
-          v-model="audioStore.activeMixer.compressorNode.release.value"
-          class="w-[100px] mx-1 text-center"
-          @change="drawCompressor(0)"
-        />
-      </div>
-      <div id="compressor-reduction" class="flex flex-col items-center">
-        <label>Reduction</label>
+    <!-- Visual -->
+    <div
+      class="relative bg-transparent border-r border-cyan-400"
+      :style="{ width: `${canvasWidth}px`, height: `${canvasHeight}px` }"
+    >
+      <div
+        id="compressor-reduction"
+        class="h-[50px] w-[100px] absolute top-0 left-[50px] flex flex-col text-xs text-center justify-center items-center hover:cursor-pointer"
+      >
+        Reduction
         <input
           disabled
           type="number"
           step="100"
-          v-model="audioStore.activeMixer.compressorNode.reduction"
-          class="w-[100px] mx-1 text-center"
-          @change="drawCompressor(0)"
+          v-model="audioStore.activeMixer!.compressorNode.reduction"
+          class="h-[30px] text-center text-xs text-cyan-400 bg-transparent hover:cursor-pointer"
         />
       </div>
-    </div>
-    <!-- Visual -->
-    <div
-      class="relative bg-black"
-      :style="{ width: `${canvasWidth}px`, height: `${canvasHeight}px` }"
-    >
       <canvas ref="cCanvas" class="w-full h-full absolute inset-0"></canvas>
       <canvas ref="aCanvas" class="w-full h-full absolute inset-0"></canvas>
+    </div>
+    <div
+      id="compressor-config"
+      class="flex flex-wrap bg-sky-800/20 border-t border-cyan-400"
+    >
+      <div
+        id="compressor-threshold"
+        class="relative h-[50px] w-[100px] pt-1 flex flex-col text-xs text-center border-b border-r border-cyan-400 hover:cursor-pointer"
+      >
+        Threshold
+        <input
+          type="number"
+          step="1"
+          max="0"
+          v-model="audioStore.activeMixer!.compressorNode.threshold.value"
+          class="absolute inset-0 pt-4 h-full text-center text-xl text-cyan-400 bg-transparent hover:cursor-pointer"
+          @wheel.prevent="
+            (e) => {
+              handleScrollAudioParam(
+                e,
+                audioStore.activeMixer!.compressorNode.threshold
+              );
+              drawCompressor(0);
+              selectAllText(e);
+            }
+          "
+          @change="drawCompressor(0)"
+          @focus="(e) => selectAllText(e)"
+        />
+      </div>
+      <div
+        id="compressor-ratio"
+        class="relative h-[50px] w-[50px] pt-1 flex flex-col text-xs text-center border-b border-r border-cyan-400 hover:cursor-pointer"
+      >
+        Ratio
+        <input
+          type="number"
+          step="1"
+          min="1"
+          max="20"
+          v-model="audioStore.activeMixer!.compressorNode.ratio.value"
+          class="absolute inset-0 pt-4 h-full text-center text-xl text-cyan-400 bg-transparent hover:cursor-pointer"
+          @wheel.prevent="
+            (e) => {
+              handleScrollAudioParam(
+                e,
+                audioStore.activeMixer!.compressorNode.ratio
+              );
+              drawCompressor(0);
+              selectAllText(e);
+            }
+          "
+          @change="drawCompressor(0)"
+          @focus="(e) => selectAllText(e)"
+        />
+      </div>
+      <div
+        id="compressor-knee"
+        class="relative h-[50px] w-[50px] pt-1 flex flex-col text-xs text-center border-b border-r border-cyan-400 hover:cursor-pointer"
+      >
+        Knee
+        <input
+          type="number"
+          step="1"
+          min="0"
+          max="40"
+          v-model="audioStore.activeMixer!.compressorNode.knee.value"
+          class="absolute inset-0 pt-4 h-full text-center text-xl text-cyan-400 bg-transparent hover:cursor-pointer"
+          @wheel.prevent="
+            (e) => {
+              handleScrollAudioParam(
+                e,
+                audioStore.activeMixer!.compressorNode.knee
+              );
+              drawCompressor(0);
+              selectAllText(e);
+            }
+          "
+          @change="drawCompressor(0)"
+          @focus="(e) => selectAllText(e)"
+        />
+      </div>
+      <div
+        id="compressor-attack"
+        class="relative h-[50px] w-[100px] pt-1 flex flex-col text-xs text-center border-b border-r border-cyan-400 hover:cursor-pointer"
+      >
+        Attack
+        <input
+          type="number"
+          step="1"
+          min="0"
+          v-model="attackRef"
+          class="absolute inset-0 pt-4 h-full text-center text-xl text-cyan-400 bg-transparent hover:cursor-pointer"
+          @wheel.prevent="
+            (e) => {
+              handleScrollValue(e);
+              drawCompressor(0);
+              selectAllText(e);
+            }
+          "
+          @change="drawCompressor(0)"
+          @focus="(e) => selectAllText(e)"
+        />
+      </div>
+      <!-- TODO! -->
+      <div
+        id="compressor-release"
+        class="relative h-[50px] w-[100px] pt-1 flex flex-col text-xs text-center border-b border-r border-cyan-400 hover:cursor-pointer"
+      >
+        Release
+        <input
+          type="number"
+          step="0.1"
+          min="0"
+          v-model="audioStore.activeMixer!.compressorNode.release.value"
+          class="absolute inset-0 pt-4 h-full text-center text-xl text-cyan-400 bg-transparent hover:cursor-pointer"
+          @wheel.prevent="
+            (e) => {
+              handleScrollAudioParam(
+                e,
+                audioStore.activeMixer!.compressorNode.release
+              );
+              drawCompressor(0);
+              selectAllText(e);
+            }
+          "
+          @change="drawCompressor(0)"
+          @focus="(e) => selectAllText(e)"
+        />
+      </div>
     </div>
   </div>
 </template>

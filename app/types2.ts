@@ -318,7 +318,6 @@ export function initializeNotes64(notes: string): Note[] {
     idx += step;
   }
 
-  console.log(notes64);
   return notes64;
 }
 
@@ -329,7 +328,7 @@ export function handleScrollAudioParam(e: WheelEvent, model: AudioParam) {
   if (e.deltaY < 0) model.value = Math.round((model.value + step) * 10) / 10;
   if (e.deltaY > 0) model.value = Math.round((model.value - step) * 10) / 10;
 
-  if (model.value % 1 !== 0) element.value = model.value.toFixed(1);
+  if (model.value % 1 !== 0) element.value = model.value.toFixed(2);
   else element.value = model.value.toString();
 }
 
