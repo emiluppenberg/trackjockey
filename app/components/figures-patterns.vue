@@ -39,40 +39,34 @@ function removeMeasure() {
 </script>
 
 <template>
-  <div class="h-auto w-full bg-slate-900 text-white">
-    <button
-      class="w-full min-h-[40px] bg-indigo-700 border-b"
-      @click="editMode = !editMode"
-    >
-      Pitch/Velocity
-    </button>
-    <div id="patterns-editor-container" class="flex justify-between w-full">
+  <div class="h-auto w-full text-white flex flex-wrap border-b border-t border-l">
+    <div id="patterns-editor-container" class="grid grid-cols-10 justify-between w-full">
       <div
         id="patterns-editor"
         v-if="audioStore.activeFigure"
-        class="flex w-full"
+        class="col-span-9 flex"
       >
         <!-- Pattern sample -->
         <div class="flex flex-col w-[100px]">
           <div
             :id="`pattern-${idxP}-sample`"
             v-for="(p, idxP) in audioStore.activeFigure.patterns"
-            class="flex w-full h-[40px] border-r border-b border-white"
+            class="flex w-full h-[50px] border-r border-b bg-sky-800/20"
           >
             <button
-              class="w-[30px] h-full text-center bg-red-600 border-r"
+              class="w-[30px] h-full text-center text-3xl text-red-600 border-r"
               @click="removePattern(idxP)"
             >
               -
             </button>
             <select
               v-model="audioStore.activeFigure.patterns[idxP]!.sample"
-              class="w-[70px] h-full text-center bg-blue-600"
+              class="w-[70px] h-full text-center bg-transparent"
             >
               <option
                 v-for="(s, idxS) in audioStore.samples"
                 :key="idxS"
-                class="bg-blue-600"
+                class="bg-sky-800"
                 :value="s"
               >
                 {{ s.name }}
@@ -85,16 +79,16 @@ function removeMeasure() {
         ></FiguresPatternsMeasures>
       </div>
       <!-- +/- Measure buttons -->
-      <div class="flex flex-col max-w-[100px]">
+      <div class="col-span-1 flex flex-col">
         <button
           @click="addMeasure"
-          class="bg-sky-400 focus:bg-sky-200 h-1/2 min-w-[100px] border-b border-l"
+          class="text-cyan-400 text-3xl h-1/2 border-b border-l"
         >
           +
         </button>
         <button
           @click="removeMeasure"
-          class="bg-sky-400 focus:bg-sky-200 h-1/2 min-w-[100px] border-b border-l"
+          class="text-cyan-400 text-3xl h-1/2 border-b border-l"
         >
           -
         </button>
@@ -102,10 +96,16 @@ function removeMeasure() {
     </div>
     <!-- New pattern -->
     <button
-      class="min-w-[100px] h-[40px] border-r bg-sky-400 focus:bg-sky-200"
+      class="w-[100px] h-[50px] text-cyan-400 text-3xl border-r bg-sky-800/20 focus:bg-sky-200"
       @click="addPattern"
     >
       +
+    </button>
+    <button
+      class="grow h-[50px] border-t"
+      @click="editMode = !editMode"
+    >
+      Pitch/Velocity
     </button>
   </div>
 </template>

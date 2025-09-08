@@ -12,7 +12,7 @@ const audioStore = useAudioStore();
       v-if="audioStore.ctx && audioStore.activeMixer"
       class="pl-[30px]"
     ></Mixer>
-    <Figures class="px-[30px] my-[50px]"></Figures>
-    <Sampler v-if="audioStore.ctx" class="px-[30px]"></Sampler>
+    <Figures class="pl-[30px] my-[50px]"></Figures>
+    <Sampler v-if="audioStore.ctx" class="pl-[30px]"></Sampler>
   </div>
 </template>

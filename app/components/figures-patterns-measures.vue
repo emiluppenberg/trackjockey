@@ -28,12 +28,12 @@ function inputMeasureNotation(e: Event, p: Pattern, idxM: number) {
   <div
     v-if="audioStore.activeFigure"
     id="pattern-columns"
-    class="max-w-[1700px] flex flex-col items-start overflow-x-auto bg-black"
+    class="w-full flex flex-col items-start overflow-x-auto bg-black"
   >
     <div
       id="pattern"
       v-for="(p, idxP) in audioStore.activeFigure.patterns"
-      class="w-auto h-[40px] flex items-center"
+      class="w-auto h-[50px] flex items-center border-b"
     >
       <!-- Pattern measures -->
       <div id="pattern-measures" class="w-full h-full flex justify-start">
@@ -44,7 +44,7 @@ function inputMeasureNotation(e: Event, p: Pattern, idxM: number) {
           class="min-w-[400px] max-w-[400px] h-full flex"
         >
           <!-- Measure -->
-          <div class="w-full flex flex-col border-r border-cyan-400">
+          <div class="w-full flex flex-col border-r">
             <!-- Textarea/Hidden -->
             <textarea
               :id="`pattern-${idxP}-measure-${idxM}-rhythm-textarea`"
@@ -59,7 +59,7 @@ function inputMeasureNotation(e: Event, p: Pattern, idxM: number) {
             ></textarea>
             <!-- Velocity -->
             <div
-              class="flex w-full h-full border-b border-cyan-400 items-start"
+              class="flex w-full h-full items-start"
               :class="{ hidden: editMeasure === m || editMode }"
             >
               <div
@@ -67,47 +67,52 @@ function inputMeasureNotation(e: Event, p: Pattern, idxM: number) {
                 class="w-full h-full flex items-center justify-evenly text-2xl"
                 @focus="handleEditMeasureRhythm(idxP, idxM, m)"
               >
-                <div v-for="(c, idxC) in m.notation" class="text-center w-[2em]">
+                <div
+                  v-for="(c, idxC) in m.notation"
+                  class="text-center w-[2em]"
+                >
                   {{ c }}
                 </div>
               </div>
             </div>
             <!-- Melody -->
             <div
-            v-if="m.notes"
-              class="flex w-full h-full border-b border-cyan-400 bg-sky-900"
+              v-if="m.notes"
+              class="flex w-full h-full bg-sky-900"
               :class="{ hidden: !editMode }"
             >
               <div class="w-full h-full flex justify-between text-xl">
+                <div
+                  v-for="(c, idxC) in m.notation"
+                  class="w-[2em] h-1/2 place-self-center select-none"
+                >
+                  <!-- Value -->
                   <div
-                    v-for="(c, idxC) in m.notation"
-                    class="w-[2em] h-1/2 place-self-center select-none"
+                    v-if="Number(c)"
+                    class="relative w-full h-full flex justify-center"
                   >
-                    <!-- Value -->
+                    <input
+                      tabindex="0"
+                      type="number"
+                      class="opacity-0 absolute inset-0 peer"
+                      v-model="
+                        m.notes[m.cursorPos!.findIndex((cp) => cp === idxC)]
+                      "
+                    />
                     <div
-                      v-if="Number(c)"
-                      class="relative w-full h-full flex justify-center"
+                      class="flex italic text-xs text-center justify-center border-l border-cyan-400 peer-focus:ring-0 peer-focus:bg-lime-700 peer-focus:text-lime-200"
                     >
-                      <input
-                        tabindex="0"
-                        type="number"
-                        class="opacity-0 absolute inset-0 peer"
-                        v-model="m.notes[m.cursorPos!.findIndex(cp => cp === idxC)]"
-                      />
-                      <div
-                        class="flex italic text-xs text-center justify-center border-l border-cyan-400 peer-focus:ring-0 peer-focus:bg-lime-700 peer-focus:text-lime-200"
-                      >
-                        {{ c }}
-                      </div>
-                    </div>
-                    <!-- NonValue -->
-                    <div
-                      v-else
-                      class="relative w-full h-full flex justify-center"
-                    >
-                      <div class="text-xs text-center">{{ c }}</div>
+                      {{ c }}
                     </div>
                   </div>
+                  <!-- NonValue -->
+                  <div
+                    v-else
+                    class="relative w-full h-full flex justify-center"
+                  >
+                    <div class="text-xs text-center">{{ c }}</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

@@ -1,17 +1,21 @@
 <script setup lang="ts">
-import { Figure } from '~/types2';
+import { Figure } from "~/types2";
 
 const audioStore = useAudioStore();
 
 function addFigure() {
-  const fLen = audioStore.figures.push(new Figure(audioStore.fLen, "New figure", "", []));
+  const fLen = audioStore.figures.push(
+    new Figure(audioStore.fLen, "New figure", "", [])
+  );
   audioStore.activeFigure = audioStore.figures[fLen - 1];
 }
 function removeFigure(idxF: number) {
   for (let i = 0; i < audioStore.figures.length; i++) {
     if (i === idxF) {
-      audioStore.figures.splice(idxF, 1);
-      return;
+      if (confirm(`Remove ${audioStore.figures[idxF]!.name}?`)) {
+        audioStore.figures.splice(idxF, 1);
+        return;
+      }
     }
   }
 }
@@ -35,10 +39,10 @@ function handleFocusOutFigure(e: Event) {
 </script>
 
 <template>
-  <div id="figures-list" class="flex min-h-[100px] border-b">
+  <div id="figures-list" class="flex h-[100px] border-t border-l rounded-tl-xl">
     <!-- New button -->
     <button
-      class="min-w-[100px] border-r border-white text-center text-3xl text-white"
+      class="min-w-[100px] border-r text-center text-3xl text-cyan-400 bg-sky-800/20"
       @click="addFigure"
     >
       +
@@ -49,43 +53,41 @@ function handleFocusOutFigure(e: Event) {
         id="figures-item"
         v-for="(f, idxF) in audioStore.figures"
         :key="idxF"
-        class="min-w-[150px] flex flex-col border-r border-cyan-400 overflow-hidden"
+        class="relative min-w-[150px] flex flex-col border-r overflow-hidden"
         :class="{
-          'bg-cyan-700': f !== audioStore.activeFigure,
-          'bg-lime-700': f === audioStore.activeFigure,
+          'bg-sky-800/10': f !== audioStore.activeFigure,
+          'bg-indigo-700/20': f === audioStore.activeFigure,
         }"
       >
-        <div
-          class="flex h-[30px] border-b border-cyan-400 bg-red-600 items-center justify-center select-none"
+        <button
+          class="absolute top-0 left-0 w-[30px] h-[30px] text-3xl text-red-600"
           @click="removeFigure(idxF)"
         >
-          <div class="text-center text-3xl">-</div>
-        </div>
+          -
+        </button>
         <div
-          class="flex flex-col h-full w-full items-center"
+          class="flex flex-col h-full w-full justify-center items-center"
           @click="audioStore.activeFigure = f"
           @click.right="(e) => handleFocusFigure(e, idxF)"
         >
           <label
             class="text-3xl text-center"
             :class="{
-              'text-cyan-200': f !== audioStore.activeFigure,
+              'text-green-400': f !== audioStore.activeFigure,
               'text-lime-200': f === audioStore.activeFigure,
             }"
           >
-            {{ (audioStore.figures.indexOf(f) + 1).toString() }}
+            {{ idxF + 1 }}
           </label>
           <input
             disabled
             :id="`figures-item-${idxF}-name`"
             type="text"
             v-model="f.name"
-            class="max-w-[130px] italic text-2xl text-center truncate pointer-events-none focus:outline-none"
+            class="max-w-[130px] italic text-3xl text-center truncate pointer-events-none focus:outline-none bg-transparent"
             :class="{
-              'text-cyan-200': f !== audioStore.activeFigure,
+              'text-green-400': f !== audioStore.activeFigure,
               'text-lime-200': f === audioStore.activeFigure,
-              'bg-cyan-700': f !== audioStore.activeFigure,
-              'bg-lime-700': f === audioStore.activeFigure,
             }"
             @focusout="(e) => handleFocusOutFigure(e)"
           />

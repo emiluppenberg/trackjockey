@@ -4,8 +4,8 @@ const audioStore = useAudioStore();
 
 <template>
   <!-- Figures.vue -->
-  <div class="flex flex-col w-full h-auto bg-sky-800 border">
-    <FiguresList v-if="audioStore.ctx"></FiguresList>
+  <div class="flex flex-col w-full h-auto">
+    <FiguresList v-if="audioStore.ctx" ></FiguresList>
     <FiguresPatterns v-if="audioStore.ctx"></FiguresPatterns>
   </div>
 </template>

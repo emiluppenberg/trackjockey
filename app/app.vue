@@ -13,6 +13,10 @@ useHead({
 </template>
 
 <style>
+* {
+  border-color: rgb(34 211 238);
+}
+
 /* Chrome, Safari, Edge, Opera */
 input::-webkit-outer-spin-button,
 input::-webkit-inner-spin-button {
