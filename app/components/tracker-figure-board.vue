@@ -21,7 +21,7 @@ function changeSoundKeyBind(e: KeyboardEvent, f: Figure) {
     <!-- Empty button -->
     <button
       tabindex="0"
-      class="w-[200px] h-[150px] mx-1 my-1 rounded-xl border border-cyan-400 text-center select-none overflow-hidden grid bg-sky-800/10"
+      class="w-[150px] h-[100px] mx-1 my-1 rounded-xl border text-center select-none overflow-hidden grid bg-sky-800/10"
       @click="audioStore.activeTrack!.mute = !audioStore.activeTrack!.mute"
     >
       <span class="text-center text-4xl text-green-400 place-self-center mt-5">
@@ -29,7 +29,7 @@ function changeSoundKeyBind(e: KeyboardEvent, f: Figure) {
       </span>
       <input
         disabled
-        class="h-[50px] text-center text-2xl text-cyan-400 border-b border-cyan-400 place-self-end w-full bg-sky-800/20"
+        class="h-[30px] text-center text-2xl text-cyan-400 border-b place-self-end w-full bg-sky-800/20"
         value="KeyQ"
       />
     </button>
@@ -38,7 +38,7 @@ function changeSoundKeyBind(e: KeyboardEvent, f: Figure) {
       v-for="(f, idxF) in figures"
       tabindex="0"
       :key="idxF"
-      class="w-[200px] h-[150px] mx-1 my-1 rounded-xl border border-cyan-400 text-center select-none overflow-hidden grid bg-sky-800/10"
+      class="w-[150px] h-[100px] mx-1 my-1 rounded-xl border text-center select-none overflow-hidden grid bg-sky-800/10"
       @click="audioStore.activeTrack!.changeFigure(f)"
     >
       <span
@@ -47,7 +47,7 @@ function changeSoundKeyBind(e: KeyboardEvent, f: Figure) {
         {{ f.name }}
       </span>
       <input
-        class="h-[50px] text-center text-2xl text-cyan-400 w-full border-b border-cyan-400 place-self-end bg-sky-800/20"
+        class="h-[30px] text-center text-2xl text-cyan-400 w-full border-b place-self-end bg-sky-800/20"
         :value="f.keyBind ? f.keyBind : 'Bind to key'"
         @keydown="(e) => changeSoundKeyBind(e, f)"
       />
