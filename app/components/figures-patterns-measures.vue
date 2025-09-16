@@ -1,3 +1,4 @@
+
 <script setup lang="ts">
 import { type Measure, Pattern, initializeNotes64 } from "~/types2";
 const props = defineProps<{ editMode: boolean }>();
